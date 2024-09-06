@@ -1,0 +1,8 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+error_handler = { path = "../crates/error_handler" }
+json_parser = { path = "../crates/json_parser" }
