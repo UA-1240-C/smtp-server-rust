@@ -6,4 +6,3 @@ edition = "2021"
 [dependencies]
 futures = "0.3.18"
 crossbeam = "0.8.0"
-error_handler = { path = "../error_handler" }
