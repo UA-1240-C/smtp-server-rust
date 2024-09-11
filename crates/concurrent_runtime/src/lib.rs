@@ -1,4 +1,4 @@
-use std::sync::{atomic::{AtomicBool, Ordering}, Arc};
+use std::{ops::Index, sync::{atomic::{AtomicBool, Ordering}, Arc}};
 use futures::{
     future::BoxFuture,
     task::{Context, Poll},
@@ -10,16 +10,14 @@ mod threadpool;
 type Task = BoxFuture<'static, ()>;
 type GlobalTaskQueue = SegQueue<Task>;
 
-struct Executor {
-    id: usize,
+pub struct Executor {
     global_queue: Arc<GlobalTaskQueue>,
     termination_flag: Arc<AtomicBool>,
 }
 
 impl Executor {
-    fn new(id: usize, global_queue: Arc<GlobalTaskQueue>) -> Self {
+    fn new(global_queue: Arc<GlobalTaskQueue>) -> Self {
         Executor {
-            id,
             global_queue,
             termination_flag: Arc::new(AtomicBool::new(false)),
         }
@@ -61,7 +59,7 @@ impl ExecutorManager {
 
     fn create_executor(&mut self) -> Arc<Atomic<Executor>> {
         let executor = Arc::new(Atomic::new(Executor::new(
-            self.executors.len(), self.global_async_queue.clone()
+            self.global_async_queue.clone()
         )));
 
         self.executors.push(executor.clone());
@@ -78,6 +76,16 @@ impl ExecutorManager {
             let mut executor = executor.load(Ordering::Relaxed, &guard);
             unsafe { executor.deref_mut().stop() };
         }
+    }
+}
+
+impl Index<usize> for ExecutorManager {
+    type Output = Arc<Atomic<Executor>>;
+
+    fn index(&self, index: usize) -> &Arc<Atomic<Executor>> {
+        self.executors
+            .get(index)
+            .expect("Index out of bounds")
     }
 }
 
