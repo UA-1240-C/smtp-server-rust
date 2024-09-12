@@ -86,6 +86,20 @@ impl AsyncStream {
         )
     }
 
+    pub fn close(&mut self) {
+        if let Some(stream) =  self.m_stream.as_mut() { 
+            match stream {
+                StreamIo::Plain(stream) => {
+                    let _ = stream.get_ref().shutdown(std::net::Shutdown::Both);
+                }
+                StreamIo::Encrypted(stream) => {
+                    let _ = stream.get_ref().get_ref().shutdown(std::net::Shutdown::Both);
+                }
+            }
+        }
+        self.m_stream.take();
+    }
+
     pub fn is_open(&self) -> bool {
         match &self.m_stream {
             Some(stream) => {
