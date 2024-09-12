@@ -1,0 +1,9 @@
+[package]
+name = "client_connection"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+smart_stream = { path = "../smart_stream" }
+request_parser = { path = "../request_parser" }
+native-tls = "0.2.7"
