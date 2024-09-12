@@ -1,0 +1,11 @@
+[package]
+name = "smart_stream"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+error_adapter = { path = "../error_adapter" }
+futures = "0.3.18"
+async-native-tls = "0.3"
+async-io = "2.3.4"
+native-tls = "0.2.7"
