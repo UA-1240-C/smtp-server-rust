@@ -4,6 +4,5 @@ version = "0.0.0"
 edition = "2021"
 
 [dependencies]
-tokio = { version = "1", features = ["full"] }
 native-tls = "0.2.7"
 async-std-resolver = "0.24.1"
