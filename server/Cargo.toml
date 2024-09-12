@@ -7,3 +7,4 @@ edition = "2021"
 concurrent_runtime = { path = "../crates/concurrent_runtime" }
 smart_stream = { path = "../crates/smart_stream" }
 native-tls = "0.2.7"
+client_connection = { path = "../crates/client_connection" }
