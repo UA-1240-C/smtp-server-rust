@@ -4,7 +4,7 @@ use smart_stream::AsyncStream;
 use std::net::TcpListener;
 
 fn main() {
-    let mut runtime = ConcurrentRuntime::new(2);
+    let mut runtime = ConcurrentRuntime::new(1);
     runtime.start();
     
 
@@ -14,7 +14,8 @@ fn main() {
         let async_stream = AsyncStream::new(stream).unwrap();
         runtime.spawn(async {
             let connection = client_connection::ClientConnection::new(async_stream).await;
-            connection.run().await});
+            connection.run().await
+        });
     }
 
 }

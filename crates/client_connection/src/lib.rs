@@ -1,4 +1,3 @@
-use core::panic;
 use std::sync::LazyLock;
 
 use smart_stream::AsyncStream;
@@ -18,7 +17,7 @@ enum ClientState {
 
 #[derive(Default)]
 pub struct ConnectionData {
-    logged_user: String,
+    // logged_user: String,
     pub mail_from: String,
     pub rcpt_to: Vec<String>,
     pub data: String,
@@ -41,10 +40,9 @@ impl ClientConnection {
 
     async fn handle_new_request(&mut self) {
         let raw_request = self.connection.read().await; // вичитує
-        println!("{:?}", raw_request);
         let request = RequestType::parse(&raw_request.unwrap()); // парсить
         println!("{:?}", request);
-        println!("{:?}", self.current_state);
+
 
         match request {
             Ok(request) => {
@@ -77,7 +75,6 @@ impl ClientConnection {
         let _ = self.connection.write(b"220 SMTP server ready\r\n").await;
         loop {
             if !self.connection.is_open(){
-                println!("Connection closed");
                 break;
             }
             self.handle_new_request().await;
@@ -85,7 +82,6 @@ impl ClientConnection {
     }
 
     async fn handle_following_connected(&mut self, request: &RequestType) {
-        // following connected expects no additional commands except loose commands
         match request {
             _ => {
                 let _ = self.connection.write(b"500 Error\r\n").await;
@@ -109,6 +105,7 @@ impl ClientConnection {
 
     async fn handle_following_starttls(&mut self, request: &RequestType) {
         match request {
+            // TODO: check in database if user exists
             RequestType::AUTH_PLAIN(_) => {
                 self.current_state = ClientState::Auth;
                 let _ = self.connection.write(b"235 OK\r\n").await;
@@ -157,10 +154,20 @@ impl ClientConnection {
                 let _ = self.connection.write(b"250 OK\r\n").await;
             },
             RequestType::DATA => {
-                self.current_state = ClientState::Data;
                 let _ = self.connection.write(b"354 End data with <CR><LF>.<CR><LF>\r\n").await;    
-                self.read_data_until_dot().await;
-                // save data to db
+                let result = Self::read_data_until_dot(&mut self.connection).await;
+
+                match result {
+                    Ok(data) => {
+                        self.connection_data.data = data;
+                        self.current_state = ClientState::Data;
+                        let _ = self.connection.write(b"250 OK\r\n").await;
+                        // TODO: save email to database
+                    },
+                    Err(err) => {
+                        let _ = self.connection.write([b"500 Error\r\n", err.as_bytes()].concat().as_ref()).await;
+                    }
+                } 
             },
             _ => {
                 let _ = self.connection.write(b"500 Error\r\n").await;
@@ -182,27 +189,32 @@ impl ClientConnection {
         }
     }
 
-    async fn read_data_until_dot(&mut self) {
+    async fn read_data_until_dot(stream: &mut AsyncStream) -> Result<String, String> {
+        println!("Reading data");
+        const MAX_SIZE: usize = 1024 * 1024 * 2;
         let mut data = String::new();
-        // TODO: enforce max data size
         loop {
-            let line = self.connection.read().await;
-            println!("{:?}", line);
+            let line = stream.read().await;
+            
             if let Ok(line) = line {
                 if line.ends_with("\r\n.\r\n") {
+                    println!("Data read");
+                    data.push_str(&line[..line.len() - 5]);
                     break;
                 }
                 data.push_str(&line);
             }
+            if data.len() > MAX_SIZE {
+                return Err("Data size is too big".into());
+            }
         }
-        self.connection_data.data = data;
-        let _ = self.connection.write(b"250 OK\r\n").await;
+        return Ok(data);
     }
 
     async fn handle_following_quit(&mut self, request: &RequestType) {
         match request {
             _ => {
-                panic!("Unreachable");
+                unreachable!("Should not accept any commands after QUIT");
             }
         }
     }

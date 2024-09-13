@@ -52,9 +52,9 @@ impl RequestType {
         } else if raw_request.starts_with(REGISTER) {
             request_res =  RequestType::parse_command_with_arg(RequestType::REGISTER, raw_request, REGISTER.len() + 1..);
         } else if raw_request.starts_with(MAIL_FROM) {
-            request_res =  RequestType::parse_command_with_arg(RequestType::MAIL_FROM, raw_request, MAIL_FROM.len() + 2..raw_request.len() - 1);
+            request_res =  RequestType::parse_command_with_arg(RequestType::MAIL_FROM, raw_request, MAIL_FROM.len() + 3..raw_request.len() - 1);
         } else if raw_request.starts_with(RCPT_TO) {
-            request_res =  RequestType::parse_command_with_arg(RequestType::RCPT_TO, raw_request, RCPT_TO.len() + 2..raw_request.len() - 1);
+            request_res =  RequestType::parse_command_with_arg(RequestType::RCPT_TO, raw_request, RCPT_TO.len() + 3..raw_request.len() - 1);
         } else if raw_request.starts_with(DATA) {
             request_res = Ok(RequestType::DATA);
         } else if raw_request.starts_with(QUIT) {
