@@ -1,5 +1,6 @@
-use std::slice::SliceIndex;
+use std::{fmt::Debug, slice::SliceIndex};
 mod commands; use commands::*;
+use logger_proc_macro::*;
 
 #[allow(non_camel_case_types)]
 #[derive(Eq, Debug, PartialEq)]
@@ -38,7 +39,7 @@ impl std::fmt::Display for RequestType {
 }
 
 impl RequestType {
-
+    #[log(trace)]
     pub fn parse(raw_request: &str) -> Result<RequestType, String> {
         let raw_request = raw_request.trim_start().trim_end();
         let request_res: Result<RequestType, String>;
@@ -71,10 +72,10 @@ impl RequestType {
 
         request_res
     }
-
-    fn parse_command_with_arg<I: SliceIndex<str>>(cmd_type: fn(String) -> RequestType, raw_request: &str, slice: I) -> Result<RequestType, String> 
+    #[log(trace)]
+    fn parse_command_with_arg<I: SliceIndex<str> + Debug>(cmd_type: fn(String) -> RequestType, raw_request: &str, slice: I) -> Result<RequestType, String> 
     where
-        <I as SliceIndex<str>>::Output: std::fmt::Display,
+        <I as SliceIndex<str>>::Output: std::fmt::Display + Debug,
     {
         let argument = raw_request.get(slice);
         if let Some(argument) = argument {
