@@ -1,3 +1,8 @@
 target/
 Cargo.lock
 server/certs/
+
+# diesel files
+migrations
+.env
+diesel.toml
