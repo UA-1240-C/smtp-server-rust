@@ -7,3 +7,5 @@ edition = "2021"
 concurrent_runtime = { path = "../crates/concurrent_runtime" }
 smtp_server = { path = "../crates/smtp_server" }
 ctrlc = "3.4"
+logger = { path = "../crates/logger" }
+logger_proc_macro = { path = "../crates/logger_proc_macro" }
