@@ -33,7 +33,7 @@ fn main() {
 
 }
 
-#[logger(trace)]
+#[log(trace)]
 pub fn fib(n: u64) -> u64 {
     if n == 0 {
         return 0;
@@ -44,7 +44,7 @@ pub fn fib(n: u64) -> u64 {
     }
 }
 
-#[logger(debug)]
+#[log(debug)]
 async fn add(a: i32, b: i32) -> i32 {
     if a == 0 {
         return b;

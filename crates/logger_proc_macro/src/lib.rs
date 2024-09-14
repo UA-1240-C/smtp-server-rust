@@ -8,7 +8,7 @@ enum ProcLogLevel {
 }
 
 #[proc_macro_attribute]
-pub fn logger(attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn log(attr: TokenStream, item: TokenStream) -> TokenStream {
     let log_level = attr.to_string().trim_matches('"').to_lowercase();
 
     assert!(log_level == "trace" || log_level == "debug", "Invalid log level");
