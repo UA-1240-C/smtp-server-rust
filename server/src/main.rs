@@ -6,6 +6,9 @@ use async_native_tls::TlsAcceptor;
 use native_tls::{Identity, TlsAcceptor as NativeTlsAcceptor};
 
 use std::net::TcpListener;
+mod config;
+
+use logger::info;
 
 use dotenv::dotenv;
 use std::env;
@@ -14,11 +17,17 @@ fn main() {
     dotenv().ok();
     logger::set_logger_level(logger::LogLevel::Trace);
     logger::set_logger_target(Box::new(logger::ConsoleLogTarget));
-    let mut runtime = ConcurrentRuntime::new(1);
+
+    let cfg = config::Config::default();
+
+    logger::set_logger_level(cfg.log_level);
+    logger::set_logger_target(cfg.log_target);
+    logger::set_logger_cache_capacity(cfg.capacity);
+
+    let mut runtime = ConcurrentRuntime::new(cfg.pool_size);
     runtime.start();
     
-
-    let listener = TcpListener::bind("127.0.0.1:2525").unwrap();
+    let listener = TcpListener::bind(format!("{}:{}", cfg.ip, cfg.port)).unwrap();
     let native_tls_acceptor: NativeTlsAcceptor = NativeTlsAcceptor::new(
         Identity::from_pkcs8(
             include_bytes!("../certs/server.crt"),
@@ -36,8 +45,8 @@ fn main() {
             let connection_string = env::var("CONNECTION_STRING").expect("CONNECTION_STRING must be set");
             let mut connection = client_connection::ClientConnection::new(async_stream, &acceptor, &connection_string);
             match connection.run().await {
-                Ok(_) => println!("Connection closed"),
-                Err(e) => println!("Connection error: {:?}", e),
+                Ok(_) => info!("Connection closed"),
+                Err(e) => info!("Connection error: {:?}", e),
             }
         });
 

@@ -1,0 +1,17 @@
+{
+    "server": {
+        "server-name": "SMTP34",
+        "server-display-name": "SMTP-34-SERVER",
+        "ip-address": "127.0.0.1",
+        "port": 2525
+    },
+    "logging": {
+        "log-target": "console",
+        "file-path": "smtp34.log",
+        "log-level": "trace",
+        "cache-capacity": 1
+    },
+    "thread-pool": {
+        "pool-size": 2,
+    },
+}
