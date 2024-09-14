@@ -5,5 +5,5 @@ edition = "2021"
 
 [dependencies]
 concurrent_runtime = { path = "../crates/concurrent_runtime" }
-smtp_server = { path = "../crates/smtp_server" }
-ctrlc = "3.4"
+smart_stream = { path = "../crates/smart_stream" }
+native-tls = "0.2.7"
