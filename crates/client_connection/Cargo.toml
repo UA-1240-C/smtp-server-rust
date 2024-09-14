@@ -10,3 +10,5 @@ native-tls = "0.2.7"
 async-native-tls = "0.3"
 logger = { path = "../logger" }
 logger_proc_macro = { path = "../logger_proc_macro" }
+mail_database = { path = "../mail_database" }
+base64= { path = "../base64" }

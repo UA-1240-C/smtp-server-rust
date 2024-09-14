@@ -7,8 +7,12 @@ use native_tls::{Identity, TlsAcceptor as NativeTlsAcceptor};
 
 use std::net::TcpListener;
 
+use dotenv::dotenv;
+use std::env;
+
 fn main() {
-    logger::set_logger_level(logger::LogLevel::Debug);
+    dotenv().ok();
+    logger::set_logger_level(logger::LogLevel::Trace);
     logger::set_logger_target(Box::new(logger::ConsoleLogTarget));
     let mut runtime = ConcurrentRuntime::new(1);
     runtime.start();
@@ -29,7 +33,8 @@ fn main() {
         let acceptor = acceptor.clone();
 
         runtime.spawn(async move {
-            let mut connection = client_connection::ClientConnection::new(async_stream, &acceptor);
+            let connection_string = env::var("CONNECTION_STRING").expect("CONNECTION_STRING must be set");
+            let mut connection = client_connection::ClientConnection::new(async_stream, &acceptor, &connection_string);
             match connection.run().await {
                 Ok(_) => println!("Connection closed"),
                 Err(e) => println!("Connection error: {:?}", e),

@@ -2,6 +2,8 @@ use logger_proc_macro::log;
 use smart_stream::AsyncStream;
 use request_parser::RequestType;
 use async_native_tls::TlsAcceptor;
+use mail_database::{IMailDB, PgMailDB};
+use base64::decode;
 
 pub mod error;
 use error::ClientConnectionError;
@@ -26,21 +28,26 @@ pub struct ConnectionData {
     pub data: String,
 }
 
-pub struct ClientConnection {
+pub struct ClientConnection<'a> {
     current_state: ClientState,
     connection: Option<AsyncStream>,
     connection_data: ConnectionData,
     tls_acceptor: TlsAcceptor,
+    db_connection: PgMailDB<'a>,
 }
 
-impl ClientConnection {
+impl ClientConnection<'_> {
     #[log(debug)]
-    pub fn new(connection: AsyncStream, tls_acceptor: &TlsAcceptor) -> Self {
+    pub fn new(connection: AsyncStream, tls_acceptor: &TlsAcceptor, connection_string: &str) -> Self {
+        let mut pg = PgMailDB::new("localhost".to_string());
+        pg.connect(connection_string);
+        
         Self {
             current_state: ClientState::Connected,
             connection: Some(connection),
             connection_data: ConnectionData::default(),
             tls_acceptor: tls_acceptor.clone(),
+            db_connection: pg,
         }
     }
     #[log(trace)]
@@ -48,7 +55,6 @@ impl ClientConnection {
         let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         let raw_request = connection.read().await?;
         let request = RequestType::parse(&raw_request);
-        println!("{:?}", request);
 
         match request {
             Ok(request) => {
@@ -112,9 +118,24 @@ impl ClientConnection {
         let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         match request {
             // TODO: check in database if user exists
-            RequestType::AUTH_PLAIN(_) => {
+            RequestType::AUTH_PLAIN(cred_string) => {
+                match decode(cred_string) {
+                    Ok(cred) => {
+                        let cred: Vec<&str> = cred.split("\0").collect();
+                        let user = cred[1];
+                        let pass = cred[2];
+                        if self.db_connection.login(user, pass).is_ok() {
+                            self.current_state = ClientState::Auth;
+                            connection.write(b"235 OK\r\n").await?;
+                        } else {
+                            connection.write(b"500 Error user not found\r\n").await?;
+                        }
+                    },
+                    Err(_) => {
+                        connection.write(b"500 Error could not decode credentials\r\n").await?;
+                    }
+                }
                 self.current_state = ClientState::Auth;
-                connection.write(b"235 OK\r\n").await?;
             },
             RequestType::REGISTER(_) => {
                 self.current_state = ClientState::Auth;
@@ -175,6 +196,7 @@ impl ClientConnection {
                         self.current_state = ClientState::Data;
                         connection.write(b"250 OK\r\n").await?;
                         // TODO: save email to database
+                        self.db_connection.insert_multiple_emails(self.connection_data.rcpt_to.iter().map(|x| &x[..]).collect(), "None", &self.connection_data.data).unwrap();
                     },
                     Err(err) => {
                         connection.write([b"500 Error\r\n", err.as_bytes()].concat().as_ref()).await?;
@@ -240,6 +262,7 @@ impl ClientConnection {
                 self.current_state = ClientState::Quit;
                 connection.write(b"221 OK\r\n").await?;
                 self.connection.take();
+                self.db_connection.disconnect();
             },
             RequestType::HELP => {
                 connection.write(b"214 OK\r\n").await?;
