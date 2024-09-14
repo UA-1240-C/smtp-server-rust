@@ -1,39 +1,50 @@
+use std::thread;
+
 use concurrent_runtime::ConcurrentRuntime;
-use smart_stream::AsyncStream;
-use std::sync::Arc;
 
-use async_native_tls::TlsAcceptor;
-use native_tls::{Identity, TlsAcceptor as NativeTlsAcceptor};
-
-use std::net::TcpListener;
+use logger_proc_macro::*;
+use logger::{set_logger_level, set_logger_target, LogLevel, ConsoleLogTarget};
+use logger::info;
 
 fn main() {
-    let mut runtime = ConcurrentRuntime::new(1);
-    runtime.start();
+    set_logger_level(LogLevel::Trace);
+    set_logger_target(Box::new(ConsoleLogTarget));
+
+
+    let mut custom_runtime = ConcurrentRuntime::new(1);
+    custom_runtime.start();
     
 
-    let listener = TcpListener::bind("127.0.0.1:2525").unwrap();
-    let native_tls_acceptor: NativeTlsAcceptor = NativeTlsAcceptor::new(
-        Identity::from_pkcs8(
-            include_bytes!("../certs/server.crt"),
-            include_bytes!("../certs/server.key"),
-        ).unwrap(),
-    ).unwrap();
+    // call the fib function
+    let result = fib(2);
+    info!("Fib result: {}", result);
 
-    let acceptor = Arc::new(TlsAcceptor::from(native_tls_acceptor));
-    loop {
-        let (stream, _) = listener.accept().unwrap();
-        let async_stream = AsyncStream::new(stream).unwrap();
-        let acceptor = acceptor.clone();
+    // call the add function
+    custom_runtime.spawn( async {
+        let result = add(2, 3).await;
+        info!("Add result: {}", result);
+    });
 
-        runtime.spawn(async move {
-            let mut connection = client_connection::ClientConnection::new(async_stream, &acceptor);
-            match connection.run().await {
-                Ok(_) => println!("Connection closed"),
-                Err(e) => println!("Connection error: {:?}", e),
-            }
-        });
+}
 
+#[log(trace)]
+pub fn fib(n: u64) -> u64 {
+    if n == 0 {
+        return 0;
+    } else if n == 1 {
+        return 1;
+    } else {
+        return fib(n - 1) + fib(n - 2);
     }
+}
 
+#[log(debug)]
+async fn add(a: i32, b: i32) -> i32 {
+    if a == 0 {
+        return b;
+    } 
+    if b == 0 {
+        return a;
+    }
+    return a + b;
 }
