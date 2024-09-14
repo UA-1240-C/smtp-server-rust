@@ -163,19 +163,19 @@ impl Logger {
                         cache.push(message);
 
                         if cache.len() >= cache_capacity.load(std::sync::atomic::Ordering::Acquire) as usize {
-                            if let Some(target) = unsafe { target.load(std::sync::atomic::Ordering::Acquire).as_ref() } {
+                            if let Some(target) = unsafe { target.load(std::sync::atomic::Ordering::Acquire).as_mut() } {
                                 Self::flush(target, &mut cache);
                             }
                         }
                     }
                     Ok(LogCommand::Flush) => {
-                        if let Some(target) = unsafe { target.load(std::sync::atomic::Ordering::Acquire).as_ref() } {
+                        if let Some(target) = unsafe { target.load(std::sync::atomic::Ordering::Acquire).as_mut() } {
                             Self::flush(target, &mut cache);
                         }
                     }
                     Ok(LogCommand::Terminate) => {
 
-                        if let Some(target) = unsafe { target.load(std::sync::atomic::Ordering::Acquire).as_ref() } {
+                        if let Some(target) = unsafe { target.load(std::sync::atomic::Ordering::Acquire).as_mut() } {
                             Self::flush(target, &mut cache);
                         }
 
@@ -200,9 +200,10 @@ impl Logger {
         })
     }
 
-    fn flush(target: &Box<dyn LogTarget + Send + Sync>, cache: &mut Vec<LogMessage>) {
+    fn flush(target: &mut Box<dyn LogTarget + Send + Sync>, cache: &mut Vec<LogMessage>) {
         let combined_logs = Self::concat_cache(cache);
         target.log(&combined_logs);
+        target.flush();
         cache.clear();
     }
 
