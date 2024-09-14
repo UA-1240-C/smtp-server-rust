@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+json_parser = { path = "../crates/json_parser" }
 concurrent_runtime = { path = "../crates/concurrent_runtime" }
 smart_stream = { path = "../crates/smart_stream" }
+async-native-tls = "0.3"
 native-tls = "0.2.7"
 client_connection = { path = "../crates/client_connection" }

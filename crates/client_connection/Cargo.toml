@@ -8,3 +8,4 @@ smart_stream = { path = "../smart_stream" }
 request_parser = { path = "../request_parser" }
 error_adapter = { path = "../error_adapter" }
 native-tls = "0.2.7"
+async-native-tls = "0.3"

@@ -3,6 +3,7 @@ use std::sync::LazyLock;
 use smart_stream::AsyncStream;
 use request_parser::RequestType;
 use error_adapter::Error;
+use async_native_tls::TlsAcceptor;
 
 #[derive(Debug)]
 enum ClientState {
@@ -28,14 +29,16 @@ pub struct ClientConnection {
     current_state: ClientState,
     connection: Option<AsyncStream>,
     connection_data: ConnectionData,
+    tls_acceptor: TlsAcceptor,
 }
 
 impl ClientConnection {
-    pub async fn new(connection: AsyncStream) -> Self {
+    pub fn new(connection: AsyncStream, tls_acceptor: &TlsAcceptor) -> Self {
         Self {
             current_state: ClientState::Connected,
             connection: Some(connection),
             connection_data: ConnectionData::default(),
+            tls_acceptor: tls_acceptor.clone(),
         }
     }
 
@@ -102,7 +105,7 @@ impl ClientConnection {
                 let _ = connection.write(b"220 Ready to start TLS\r\n").await;
                 self.current_state = ClientState::StartTLS;
 
-                connection.accept_tls(IDENTITY.clone()).await.unwrap();
+                connection.accept_tls(&self.tls_acceptor).await?;
             },
             _ => {
                 let _ = connection.write(b"500 Error\r\n").await;
@@ -271,10 +274,3 @@ impl ClientConnection {
 
 
 }
-
-
-
-static IDENTITY: LazyLock<native_tls::Identity> = LazyLock::new(|| native_tls::Identity::from_pkcs8(
-    include_bytes!("../../../server/certs/server.crt"),
-    include_bytes!("../../../server/certs/server.key"),
-).unwrap());
