@@ -1,21 +1,15 @@
 use std::thread;
 
 use concurrent_runtime::ConcurrentRuntime;
-use smtp_server::SmtpServer;
+
 use logger_proc_macro::*;
 use logger::{set_logger_level, set_logger_target, LogLevel, ConsoleLogTarget};
 use logger::info;
 
 fn main() {
-    set_logger_level(LogLevel::Debug);
+    set_logger_level(LogLevel::Trace);
     set_logger_target(Box::new(ConsoleLogTarget));
 
-    ctrlc::set_handler(move || {
-        println!("received Ctrl+C!");
-        println!("Shutting down server...");
-        std::process::exit(0);
-    })
-    .expect("Error setting Ctrl-C handler");
 
     let mut custom_runtime = ConcurrentRuntime::new(1);
     custom_runtime.start();

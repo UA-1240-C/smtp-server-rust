@@ -4,8 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+json_parser = { path = "../crates/json_parser" }
 concurrent_runtime = { path = "../crates/concurrent_runtime" }
-smtp_server = { path = "../crates/smtp_server" }
-ctrlc = "3.4"
+smart_stream = { path = "../crates/smart_stream" }
+async-native-tls = "0.3"
+native-tls = "0.2.7"
+client_connection = { path = "../crates/client_connection" }
 logger = { path = "../crates/logger" }
 logger_proc_macro = { path = "../crates/logger_proc_macro" }
