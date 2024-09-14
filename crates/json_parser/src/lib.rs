@@ -1,4 +1,4 @@
-use error_handler::{Error, JsonErrorType};
+use error_adapter::{Error, JsonErrorType};
 
 use tree_sitter::Node;
 use std::ops::Index;

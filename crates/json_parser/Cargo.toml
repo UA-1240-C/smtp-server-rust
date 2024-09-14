@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-error_handler = { path = "../error_handler" }
+error_adapter = { path = "../error_adapter" }
 tree-sitter = "0.20.0"
 tree-sitter-json = "0.20.0"
