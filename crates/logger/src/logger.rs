@@ -247,4 +247,10 @@ impl Logger {
             }
         }
     }
+
+    pub fn get_log_level(&self) -> LogLevel {
+        let level_ptr = self.level.load(std::sync::atomic::Ordering::Acquire);
+        let level = unsafe { &*level_ptr };
+        *level
+    }
 }

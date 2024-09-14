@@ -30,3 +30,7 @@ pub fn set_logger_cache_capacity(capacity: usize) {
     LOGGER.update_cache_capacity(capacity);
 }
 
+pub fn get_logger_level() -> LogLevel {
+    LOGGER.get_log_level()
+}
+

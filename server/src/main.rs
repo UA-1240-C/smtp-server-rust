@@ -7,7 +7,7 @@ use logger::{set_logger_level, set_logger_target, LogLevel, ConsoleLogTarget};
 use logger::info;
 
 fn main() {
-    set_logger_level(LogLevel::Trace);
+    set_logger_level(LogLevel::Debug);
     set_logger_target(Box::new(ConsoleLogTarget));
 
     ctrlc::set_handler(move || {
