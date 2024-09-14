@@ -86,7 +86,7 @@ impl LogTarget for FileLogTarget {
 }
 
 impl FileLogTarget {
-    fn new(path: &path::Path) -> Self {
+    pub fn new(path: &path::Path) -> Self {
         let file = File::create(path).unwrap();
         FileLogTarget { file }
     }
