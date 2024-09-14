@@ -30,7 +30,7 @@ fn main() {
             let mut connection = client_connection::ClientConnection::new(async_stream, &acceptor);
             match connection.run().await {
                 Ok(_) => println!("Connection closed"),
-                Err(e) => println!("Connection error: {}", e),
+                Err(e) => println!("Connection error: {:?}", e),
             }
         });
 

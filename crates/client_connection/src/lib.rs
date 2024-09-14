@@ -1,9 +1,9 @@
-use std::sync::LazyLock;
-
 use smart_stream::AsyncStream;
 use request_parser::RequestType;
-use error_adapter::Error;
 use async_native_tls::TlsAcceptor;
+
+pub mod error;
+use error::ClientConnectionError;
 
 #[derive(Debug)]
 enum ClientState {
@@ -42,12 +42,11 @@ impl ClientConnection {
         }
     }
 
-    async fn handle_new_request(&mut self) -> Result<(), Error> {
-        let connection = self.connection.as_mut().ok_or(Error::ClosedConnection("Connection is closed".into()))?;
-        let raw_request = connection.read().await; // вичитує
-        let request = RequestType::parse(&raw_request.unwrap()); // парсить
+    async fn handle_new_request(&mut self) -> Result<(), ClientConnectionError> {
+        let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
+        let raw_request = connection.read().await?;
+        let request = RequestType::parse(&raw_request);
         println!("{:?}", request);
-
 
         match request {
             Ok(request) => {
@@ -68,17 +67,14 @@ impl ClientConnection {
                 }
             },
             Err(err) => {
-                let _ = connection.write([b"500 Error\r\n", err.as_bytes()].concat().as_ref()).await;
+                connection.write([b"500 Error\r\n", err.as_bytes()].concat().as_ref()).await?;
             }
         }
         Ok(())
-        
     }
 
-
-
-    pub async fn run(&mut self) -> Result<(), Error> {
-        let connection = self.connection.as_mut().ok_or(Error::ClosedConnection("Connection is closed".into()))?;
+    pub async fn run(&mut self) -> Result<(), ClientConnectionError> {
+        let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         connection.write(b"220 SMTP server ready\r\n").await?;
         loop {
             if self.connection.is_none() {
@@ -88,53 +84,49 @@ impl ClientConnection {
         }
     }
 
-    async fn handle_following_connected(&mut self, request: &RequestType) -> Result<(), Error> {
-        let connection = self.connection.as_mut().ok_or(Error::ClosedConnection("Connection is closed".into()))?;
-        match request {
-            _ => {
-                let _ = connection.write(b"500 Error\r\n").await;
-            }
-        }
+    async fn handle_following_connected(&mut self, _request: &RequestType) -> Result<(), ClientConnectionError> {
+        let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
+        connection.write(b"500 Error\r\n").await?;
         Ok(())
     }
 
-    async fn handle_following_ehlo(&mut self, request: &RequestType) -> Result<(), Error> {
-        let connection = self.connection.as_mut().ok_or(Error::ClosedConnection("Connection is closed".into()))?;
+    async fn handle_following_ehlo(&mut self, request: &RequestType) -> Result<(), ClientConnectionError> {
+        let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         match request {
             RequestType::STARTTLS => {
-                let _ = connection.write(b"220 Ready to start TLS\r\n").await;
+                connection.write(b"220 Ready to start TLS\r\n").await?;
                 self.current_state = ClientState::StartTLS;
 
                 connection.accept_tls(&self.tls_acceptor).await?;
             },
             _ => {
-                let _ = connection.write(b"500 Error\r\n").await;
+                connection.write(b"500 Error\r\n").await?;
             }
         }
         Ok(())
     }
 
-    async fn handle_following_starttls(&mut self, request: &RequestType) -> Result<(), Error> {
-        let connection = self.connection.as_mut().ok_or(Error::ClosedConnection("Connection is closed".into()))?;
+    async fn handle_following_starttls(&mut self, request: &RequestType) -> Result<(), ClientConnectionError> {
+        let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         match request {
             // TODO: check in database if user exists
             RequestType::AUTH_PLAIN(_) => {
                 self.current_state = ClientState::Auth;
-                let _ = connection.write(b"235 OK\r\n").await;
+                connection.write(b"235 OK\r\n").await?;
             },
             RequestType::REGISTER(_) => {
                 self.current_state = ClientState::Auth;
-                let _ = connection.write(b"235 OK\r\n").await;
+                connection.write(b"235 OK\r\n").await?;
             },
             _ => {
-                let _ = connection.write(b"500 Error\r\n").await;  
+                connection.write(b"500 Error\r\n").await?; 
             }
         }
         Ok(())
     }
 
-    async fn handle_following_auth(&mut self, request: &RequestType) -> Result<(), Error> {
-        let connection = self.connection.as_mut().ok_or(Error::ClosedConnection("Connection is closed".into()))?;
+    async fn handle_following_auth(&mut self, request: &RequestType) -> Result<(), ClientConnectionError> {
+        let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         match request {
             RequestType::MAIL_FROM(_) => {
                 self.current_state = ClientState::MailFrom;
@@ -148,63 +140,63 @@ impl ClientConnection {
         Ok(())
     }
 
-    async fn handle_following_mail_from(&mut self, request: &RequestType) -> Result<(), Error> {
-        let connection = self.connection.as_mut().ok_or(Error::ClosedConnection("Connection is closed".into()))?;
+    async fn handle_following_mail_from(&mut self, request: &RequestType) -> Result<(), ClientConnectionError> {
+        let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         match request {
             RequestType::RCPT_TO(rcpt_to) => {
                 self.connection_data.rcpt_to.push(rcpt_to.clone());
                 self.current_state = ClientState::RcptTo;
-                let _ = connection.write(b"250 OK\r\n").await;
+                connection.write(b"250 OK\r\n").await?;
             },
             _ => {
-                let _ = connection.write(b"500 Error\r\n").await;
+                connection.write(b"500 Error\r\n").await?;
             }
         }
         Ok(())
     }
 
-    async fn handle_following_rcpt_to(&mut self, request: &RequestType) -> Result<(), Error> {
-        let connection = self.connection.as_mut().ok_or(Error::ClosedConnection("Connection is closed".into()))?;
+    async fn handle_following_rcpt_to(&mut self, request: &RequestType) -> Result<(), ClientConnectionError> {
+        let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         match request {
             RequestType::RCPT_TO(rcpt_to) => {
                 self.connection_data.rcpt_to.push(rcpt_to.clone());
                 self.current_state = ClientState::RcptTo;
-                let _ = connection.write(b"250 OK\r\n").await;
+                connection.write(b"250 OK\r\n").await?;
             },
             RequestType::DATA => {
-                let _ = connection.write(b"354 End data with <CR><LF>.<CR><LF>\r\n").await;    
+                connection.write(b"354 End data with <CR><LF>.<CR><LF>\r\n").await?; 
                 let result = Self::read_data_until_dot(connection).await;
 
                 match result {
                     Ok(data) => {
                         self.connection_data.data = data;
                         self.current_state = ClientState::Data;
-                        let _ = connection.write(b"250 OK\r\n").await;
+                        connection.write(b"250 OK\r\n").await?;
                         // TODO: save email to database
                     },
                     Err(err) => {
-                        let _ = connection.write([b"500 Error\r\n", err.as_bytes()].concat().as_ref()).await;
+                        connection.write([b"500 Error\r\n", err.as_bytes()].concat().as_ref()).await?;
                     }
                 } 
             },
             _ => {
-                let _ = connection.write(b"500 Error\r\n").await;
+                connection.write(b"500 Error\r\n").await?;
             }
         }
         Ok(())
     }
 
-    async fn handle_following_data(&mut self, request: &RequestType) -> Result<(), Error> {
-        let connection = self.connection.as_mut().ok_or(Error::ClosedConnection("Connection is closed".into()))?;
+    async fn handle_following_data(&mut self, request: &RequestType) -> Result<(), ClientConnectionError> {
+        let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         match request {
             RequestType::MAIL_FROM(mail_from) => {
                 self.current_state = ClientState::MailFrom;
                 self.connection_data = ConnectionData::default();
                 self.connection_data.rcpt_to.push(mail_from.clone());
-                let _ = connection.write(b"250 OK\r\n").await;
+                connection.write(b"250 OK\r\n").await?;
             },
             _ => {
-                let _ = connection.write(b"500 Error\r\n").await;
+                connection.write(b"500 Error\r\n").await?;
             }
         }
         Ok(())
@@ -218,7 +210,6 @@ impl ClientConnection {
             
             if let Ok(line) = line {
                 if line.ends_with("\r\n.\r\n") {
-                    println!("Data read");
                     data.push_str(&line[..line.len() - 5]);
                     break;
                 }
@@ -228,19 +219,15 @@ impl ClientConnection {
                 return Err("Data size is too big".into());
             }
         }
-        return Ok(data);
+        Ok(data)
     }
 
-    async fn handle_following_quit(&mut self, request: &RequestType) -> Result<(), Error> {
-        match request {
-            _ => {
-                unreachable!("Should not accept any commands after QUIT");
-            }
-        }
+    async fn handle_following_quit(&mut self, _request: &RequestType) -> Result<(), ClientConnectionError> {
+        unreachable!("Should not accept any commands after QUIT");
     }
 
-    async fn handle_if_loose(&mut self, request: &RequestType) -> Result<bool, Error> {
-        let connection = self.connection.as_mut().ok_or(Error::ClosedConnection("Connection is closed".into()))?;
+    async fn handle_if_loose(&mut self, request: &RequestType) -> Result<bool, ClientConnectionError> {
+        let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         match request {
             RequestType::EHLO(_) => {
                 self.current_state = ClientState::Ehlo;
@@ -267,10 +254,6 @@ impl ClientConnection {
                 return Ok(false);
             }
         }
-        return Ok(true);
+        Ok(true)
     }
-
-
-
-
 }
