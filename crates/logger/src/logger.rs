@@ -137,7 +137,10 @@ impl Logger {
             timestamp: chrono::Local::now(),
             message,
         };
-        self.sender.send(LogCommand::Log(message)).unwrap();
+        match self.sender.send(LogCommand::Log(message)) {
+            Ok(_) => {},
+            Err(_) => eprintln!("Failed to send log message to logger thread"),
+        }
     }
 
     fn start_logger_thread(receiver: crossbeam::channel::Receiver<LogCommand>,
@@ -162,10 +165,17 @@ impl Logger {
 
                         cache.push(message);
 
-                        if cache.len() >= cache_capacity.load(std::sync::atomic::Ordering::Acquire) as usize {
+                        let cache_capacity = cache_capacity.load(std::sync::atomic::Ordering::Acquire) as usize;
+                        if cache.len() >= cache_capacity {
                             if let Some(target) = unsafe { target.load(std::sync::atomic::Ordering::Acquire).as_mut() } {
                                 Self::flush(target, &mut cache);
                             }
+
+                            if cache.capacity() != cache_capacity {
+                                cache = Vec::with_capacity(cache_capacity);
+                            }
+
+
                         }
                     }
                     Ok(LogCommand::Flush) => {
