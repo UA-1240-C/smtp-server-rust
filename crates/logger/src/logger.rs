@@ -174,8 +174,6 @@ impl Logger {
                             if cache.capacity() != cache_capacity {
                                 cache = Vec::with_capacity(cache_capacity);
                             }
-
-
                         }
                     }
                     Ok(LogCommand::Flush) => {

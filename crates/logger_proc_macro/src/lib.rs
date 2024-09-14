@@ -56,9 +56,9 @@ pub fn log(attr: TokenStream, item: TokenStream) -> TokenStream {
     });
     
     // string with the function arguments and their types
-    let log_args_type = quote! { format!("({})", vec![#(#log_args_type),*].join(", ")) };
+    let log_args_type = quote! { format!("({})", (vec![#(#log_args_type),*] as Vec<String>).join(", ")) };
     // string with the function arguments and their values
-    let log_args_value = quote! { format!("({})", vec![#(#log_args_value),*].join(", ")) };
+    let log_args_value = quote! { format!("({})", (vec![#(#log_args_value),*] as Vec<String>).join(", ")) };
 
 
     let call_original_fn = if is_async {
