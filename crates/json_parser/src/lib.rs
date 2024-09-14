@@ -1,10 +1,10 @@
-use error_adapter::{Error, JsonErrorType};
-
 use tree_sitter::Node;
 use std::ops::Index;
 use std::collections::HashMap;
 
-// Enum to represent JSON values
+pub mod error;
+pub use error::JsonError;
+
 #[derive(Debug)]
 pub enum JsonValue {
     Object(HashMap<String, JsonValue>),
@@ -57,7 +57,6 @@ impl JsonValue {
     }
 }
 
-// Implement indexing for JsonValue to use the [] operator
 impl Index<&str> for JsonValue {
     type Output = JsonValue;
 
@@ -87,17 +86,17 @@ pub struct JsonParser {
 }
 
 impl JsonParser {
-    pub fn parse(&mut self, code: &str) -> std::result::Result<JsonValue, Error> {
-        let tree = self.parser.parse(code, None).ok_or(Error::JsonError(JsonErrorType::ParseError))?;
+    pub fn parse(&mut self, code: &str) -> std::result::Result<JsonValue, JsonError> {
+        let tree = self.parser.parse(code, None).ok_or(JsonError::ParseError)?;
         let root_node = tree.root_node();
 
-        let json_obj = root_node.child(0).ok_or(Error::JsonError(JsonErrorType::UnreachableChild))?;
+        let json_obj = root_node.child(0).ok_or(JsonError::BrokenTree)?;
         let json_value = Self::parse_json_node(json_obj, code)?;
 
         Ok(json_value)
     }
 
-    pub fn parse_json_node(node: Node, code: &str) -> std::result::Result<JsonValue, Error> {
+    pub fn parse_json_node(node: Node, code: &str) -> std::result::Result<JsonValue, JsonError> {
         match node.kind() {
             "object" => {
                 let mut object = HashMap::new();
@@ -133,7 +132,7 @@ impl JsonParser {
                 Ok(JsonValue::Array(array))
             }
             "string" => {
-                let value = &code[node.start_byte() + 1..node.end_byte() - 1]; // Remove quotes
+                let value = &code[node.start_byte() + 1..node.end_byte() - 1];
                 Ok(JsonValue::String(value.to_string()))
             }
             "number" => {
@@ -143,11 +142,11 @@ impl JsonParser {
             "true" => Ok(JsonValue::Bool(true)),
             "false" => Ok(JsonValue::Bool(false)),
             "null" => Ok(JsonValue::Null),
-            _ => Err(Error::JsonError(JsonErrorType::ParseError)), // This line will catch any unexpected node kinds
+            _ => Err(JsonError::ParseError),
         }
     }
 
-    pub fn parse_pair(node: Node, code: &str) -> Result<(String, JsonValue), Error> {
+    pub fn parse_pair(node: Node, code: &str) -> Result<(String, JsonValue), JsonError> {
         let mut cursor = node.walk();
         cursor.goto_first_child();
         let key_node = cursor.node();

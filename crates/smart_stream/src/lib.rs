@@ -10,7 +10,9 @@ use futures::{
 };
 use async_io::Async;
 use async_native_tls::{TlsConnector, TlsAcceptor, TlsStream};
-use error_adapter::Error;
+
+pub mod error;
+use error::{SmartStreamError, TlsError};
 
 type AsyncTcpStream = Async<std::net::TcpStream>;
 
@@ -75,8 +77,8 @@ pub struct AsyncStream {
 
 #[allow(dead_code)]
 impl AsyncStream {
-    pub fn new(stream: TcpStream) -> Result<Self, Error> {
-        let stream = Async::new(stream).map_err(Error::from)?;
+    pub fn new(stream: TcpStream) -> Result<Self, SmartStreamError> {
+        let stream = Async::new(stream).map_err(SmartStreamError::from)?;
         Ok(
             Self {
                 m_stream: Some(StreamIo::Plain(stream)),
@@ -111,12 +113,12 @@ impl AsyncStream {
         }
     }
 
-    pub async fn connect_tls(&mut self) -> Result<(), Error> {
+    pub async fn connect_tls(&mut self) -> Result<(), SmartStreamError> {
         if !self.is_open() {
-            return Err(Error::ClosedConnection("Error on connect_tls occured".to_string()));
+            return Err(SmartStreamError::ClosedConnection("Error on connect_tls occured".to_string()));
         }
 
-        let stream = self.m_stream.take().ok_or(Error::RuntimeError("Error taking stream from option".to_string()))?;
+        let stream = self.m_stream.take().ok_or(SmartStreamError::RuntimeError("Error taking stream from option".to_string()))?;
 
         let connector = TlsConnector::new()
             .danger_accept_invalid_certs(true)
@@ -129,7 +131,7 @@ impl AsyncStream {
                 StreamIo::Encrypted(stream)
             }
             StreamIo::Encrypted(_stream) => {
-                return Err(Error::TlsUpgrade("Already encrypted".to_string()));
+                return Err(SmartStreamError::Tls(TlsError::StreamAlreadyEncrypted));
             }
         };
 
@@ -137,12 +139,12 @@ impl AsyncStream {
         Ok(())
     }
 
-    pub async fn accept_tls(&mut self, acceptor: &TlsAcceptor) -> Result<(), Error> {
+    pub async fn accept_tls(&mut self, acceptor: &TlsAcceptor) -> Result<(), SmartStreamError> {
         if !self.is_open() {
-            return Err(Error::ClosedConnection("Error on accept_tls occured".to_string()));
+            return Err(SmartStreamError::ClosedConnection("Error on accept_tls occured".to_string()));
         }
 
-        let stream = self.m_stream.take().ok_or(Error::RuntimeError("Error taking stream from option".to_string()))?;
+        let stream = self.m_stream.take().ok_or(SmartStreamError::RuntimeError("Error taking stream from option".to_string()))?;
 
         let stream = match stream {
             StreamIo::Plain(stream) => {
@@ -150,7 +152,7 @@ impl AsyncStream {
                 StreamIo::Encrypted(stream)
             }
             StreamIo::Encrypted(_stream) => {
-                return Err(Error::TlsUpgrade("Already encrypted".to_string()));
+                return Err(SmartStreamError::Tls(TlsError::StreamAlreadyEncrypted));
             }
         };
 
@@ -158,26 +160,26 @@ impl AsyncStream {
         Ok(())
     }
 
-    pub async fn write(&mut self, buf: &[u8]) -> Result<usize, Error> {
+    pub async fn write(&mut self, buf: &[u8]) -> Result<usize, SmartStreamError> {
         if self.is_open() {
             match self.m_stream.as_mut() {
-                Some(stream) => stream.write(buf).await.map_err(Error::from),
-                None => Err(Error::RuntimeError("Error getting mutable reference on try to write".to_string())),
+                Some(stream) => stream.write(buf).await.map_err(SmartStreamError::from),
+                None => Err(SmartStreamError::RuntimeError("Error getting mutable reference on try to write".to_string())),
             }
         } else {
-            Err(Error::ClosedConnection("Error on write occured".to_string()))
+            Err(SmartStreamError::ClosedConnection("Error on write occured".to_string()))
         }
     }
 
-    pub async fn read(&mut self) -> Result<String, Error> {
+    pub async fn read(&mut self) -> Result<String, SmartStreamError> {
         if self.is_open() {
             self.read_until_crlf().await
         } else {
-            Err(Error::ClosedConnection("Error on read occured".to_string()))
+            Err(SmartStreamError::ClosedConnection("Error on read occured".to_string()))
         }
     }
 
-    async fn read_until_crlf(&mut self) -> Result<String, Error> {
+    async fn read_until_crlf(&mut self) -> Result<String, SmartStreamError> {
         let mut response = String::new();
         let mut buffer: Vec<u8> = vec![0; self.m_buffsize as usize];
         let mut bytes_read: usize;
