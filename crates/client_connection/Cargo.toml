@@ -6,4 +6,5 @@ edition = "2021"
 [dependencies]
 smart_stream = { path = "../smart_stream" }
 request_parser = { path = "../request_parser" }
+error_adapter = { path = "../error_adapter" }
 native-tls = "0.2.7"

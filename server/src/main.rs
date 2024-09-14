@@ -12,10 +12,15 @@ fn main() {
     loop {
         let (stream, _) = listener.accept().unwrap();
         let async_stream = AsyncStream::new(stream).unwrap();
+
         runtime.spawn(async {
-            let connection = client_connection::ClientConnection::new(async_stream).await;
-            connection.run().await
+            let mut connection = client_connection::ClientConnection::new(async_stream).await;
+            match connection.run().await {
+                Ok(_) => println!("Connection closed"),
+                Err(e) => println!("Connection error: {}", e),
+            }
         });
+
     }
 
 }
