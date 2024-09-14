@@ -9,7 +9,6 @@ use futures::{
     io::{AsyncRead, AsyncWrite},
 };
 use async_io::Async;
-use native_tls::{Identity, TlsAcceptor as NativeTlsAcceptor};
 use async_native_tls::{TlsConnector, TlsAcceptor, TlsStream};
 use error_adapter::Error;
 
@@ -124,13 +123,10 @@ impl AsyncStream {
         Ok(())
     }
 
-    pub async fn accept_tls(&mut self, identity: Identity) -> Result<(), Error> {
+    pub async fn accept_tls(&mut self, acceptor: &TlsAcceptor) -> Result<(), Error> {
         if !self.is_open() {
             return Err(Error::ClosedConnection("Error on accept_tls occured".to_string()));
         }
-
-        let native_acceptor = NativeTlsAcceptor::builder(identity).build()?;
-        let acceptor = TlsAcceptor::from(native_acceptor);
 
         let stream = self.m_stream.take().ok_or(Error::RuntimeError("Error taking stream from option".to_string()))?;
 
