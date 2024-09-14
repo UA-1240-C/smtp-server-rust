@@ -62,9 +62,10 @@ impl Index<&str> for JsonValue {
     type Output = JsonValue;
 
     fn index(&self, key: &str) -> &Self::Output {
-        match self {
-            JsonValue::Object(map) => map.get(key).unwrap_or(&JsonValue::Null),
-            _ => &JsonValue::Null,
+        if let JsonValue::Object(map) = self {
+            map.get(key).unwrap_or(&JsonValue::Null)
+        } else {
+            &JsonValue::Null
         }
     }
 }
@@ -73,9 +74,10 @@ impl Index<usize> for JsonValue {
     type Output = JsonValue;
 
     fn index(&self, index: usize) -> &Self::Output {
-        match self {
-            JsonValue::Array(arr) => arr.get(index).unwrap_or(&JsonValue::Null),
-            _ => &JsonValue::Null,
+        if let JsonValue::Array(arr) = self {
+            arr.get(index).unwrap_or(&JsonValue::Null)
+        } else {
+            &JsonValue::Null
         }
     }
 }
