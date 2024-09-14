@@ -1,4 +1,12 @@
+use std::fmt::Display;
+use std::num::ParseFloatError;
 use std::{fmt::Display, net::AddrParseError};
+
+#[derive(Debug, PartialEq)]
+pub enum JsonErrorType {
+    ParseError,
+    UnreachableChild,
+}
 
 #[derive(Debug)]
 pub enum Error {
@@ -8,11 +16,13 @@ pub enum Error {
     AddrParseError(std::net::AddrParseError),
     ClosedConnection(String),
     RuntimeError(String),
+    JsonError(JsonErrorType),
 }
 
 impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
+            (Error::JsonError(a), Error::JsonError(b)) => { a == b },
             (Error::Io(_), Error::Io(_)) => false,
             (Error::Tls(_), Error::Tls(_)) => false,
             (Error::TlsUpgrade(a), Error::TlsUpgrade(b)) => a == b,
@@ -25,7 +35,13 @@ impl PartialEq for Error {
 
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{:?}\n", self)
+            writeln!(f, "{:?}", self)
+    }
+}
+
+impl From<ParseFloatError> for Error {
+    fn from(_err: ParseFloatError) -> Self {
+        Error::JsonError(JsonErrorType::ParseError)
     }
 }
 
