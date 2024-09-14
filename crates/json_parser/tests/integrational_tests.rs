@@ -129,4 +129,49 @@ mod tests {
         println!("{:?}", json_parse_result);
         assert!(json_parse_result.is_err());
     }
+
+    #[test]
+    fn array_test() {
+        let code = r#"
+            {
+                "students":
+                [
+                    {
+                        "name": "John Doe",
+                        "age": 30,
+                        "is_student": true
+                    },
+                    {
+                        "name": "Jane Doe",
+                        "age": 28,
+                        "is_student": true
+                    }
+                ]
+            }
+        "#;
+
+        let mut perser = JsonParser::default();
+        let json_value = perser.parse(code).unwrap();
+
+        let students = &json_value["students"].as_array().unwrap();
+
+        let student1 = &students[0].as_object().unwrap();
+        let student2 = &students[1].as_object().unwrap();
+
+        let name1 = student1["name"].as_str().unwrap();
+        let age1 = student1["age"].as_number().unwrap();
+        let is_student1 = student1["is_student"].as_bool().unwrap();
+
+        let name2 = student2["name"].as_str().unwrap();
+        let age2 = student2["age"].as_number().unwrap();
+        let is_student2 = student2["is_student"].as_bool().unwrap();
+
+        assert_eq!(name1, "John Doe");
+        assert_eq!(age1, 30.0);
+        assert!(is_student1);
+
+        assert_eq!(name2, "Jane Doe");
+        assert_eq!(age2, 28.0);
+        assert!(is_student2);
+    }
 }
