@@ -1,4 +1,3 @@
-use std::fmt::Display;
 use std::num::ParseFloatError;
 use std::{fmt::Display, net::AddrParseError};
 
