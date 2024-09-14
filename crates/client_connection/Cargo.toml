@@ -8,3 +8,5 @@ smart_stream = { path = "../smart_stream" }
 request_parser = { path = "../request_parser" }
 native-tls = "0.2.7"
 async-native-tls = "0.3"
+logger = { path = "../logger" }
+logger_proc_macro = { path = "../logger_proc_macro" }

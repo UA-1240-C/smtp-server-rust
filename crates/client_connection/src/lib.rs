@@ -1,3 +1,4 @@
+use logger_proc_macro::log;
 use smart_stream::AsyncStream;
 use request_parser::RequestType;
 use async_native_tls::TlsAcceptor;
@@ -17,7 +18,7 @@ enum ClientState {
     Quit,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct ConnectionData {
     // logged_user: String,
     pub mail_from: String,
@@ -33,6 +34,7 @@ pub struct ClientConnection {
 }
 
 impl ClientConnection {
+    #[log(debug)]
     pub fn new(connection: AsyncStream, tls_acceptor: &TlsAcceptor) -> Self {
         Self {
             current_state: ClientState::Connected,
@@ -41,7 +43,7 @@ impl ClientConnection {
             tls_acceptor: tls_acceptor.clone(),
         }
     }
-
+    #[log(trace)]
     async fn handle_new_request(&mut self) -> Result<(), ClientConnectionError> {
         let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         let raw_request = connection.read().await?;
@@ -72,7 +74,7 @@ impl ClientConnection {
         }
         Ok(())
     }
-
+    #[log(trace)]
     pub async fn run(&mut self) -> Result<(), ClientConnectionError> {
         let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         connection.write(b"220 SMTP server ready\r\n").await?;
@@ -83,13 +85,13 @@ impl ClientConnection {
             self.handle_new_request().await?;
         }
     }
-
+    #[log(trace)]
     async fn handle_following_connected(&mut self, _request: &RequestType) -> Result<(), ClientConnectionError> {
         let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         connection.write(b"500 Error\r\n").await?;
         Ok(())
     }
-
+    #[log(trace)]
     async fn handle_following_ehlo(&mut self, request: &RequestType) -> Result<(), ClientConnectionError> {
         let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         match request {
@@ -105,7 +107,7 @@ impl ClientConnection {
         }
         Ok(())
     }
-
+    #[log(trace)]
     async fn handle_following_starttls(&mut self, request: &RequestType) -> Result<(), ClientConnectionError> {
         let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         match request {
@@ -124,7 +126,7 @@ impl ClientConnection {
         }
         Ok(())
     }
-
+    #[log(trace)]
     async fn handle_following_auth(&mut self, request: &RequestType) -> Result<(), ClientConnectionError> {
         let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         match request {
@@ -139,7 +141,7 @@ impl ClientConnection {
         }
         Ok(())
     }
-
+    #[log(trace)]
     async fn handle_following_mail_from(&mut self, request: &RequestType) -> Result<(), ClientConnectionError> {
         let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         match request {
@@ -154,7 +156,7 @@ impl ClientConnection {
         }
         Ok(())
     }
-
+    #[log(trace)]
     async fn handle_following_rcpt_to(&mut self, request: &RequestType) -> Result<(), ClientConnectionError> {
         let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         match request {
@@ -185,7 +187,7 @@ impl ClientConnection {
         }
         Ok(())
     }
-
+    #[log(trace)]
     async fn handle_following_data(&mut self, request: &RequestType) -> Result<(), ClientConnectionError> {
         let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         match request {
@@ -201,7 +203,7 @@ impl ClientConnection {
         }
         Ok(())
     }
-
+    #[log(debug)]
     async fn read_data_until_dot(stream: &mut AsyncStream) -> Result<String, String> {
         const MAX_SIZE: usize = 1024 * 1024 * 2;
         let mut data = String::new();
@@ -221,11 +223,11 @@ impl ClientConnection {
         }
         Ok(data)
     }
-
+    #[log(trace)]
     async fn handle_following_quit(&mut self, _request: &RequestType) -> Result<(), ClientConnectionError> {
         unreachable!("Should not accept any commands after QUIT");
     }
-
+    #[log(trace)]
     async fn handle_if_loose(&mut self, request: &RequestType) -> Result<bool, ClientConnectionError> {
         let connection = self.connection.as_mut().ok_or(ClientConnectionError::ClosedConnection)?;
         match request {

@@ -27,7 +27,6 @@ where T: AsyncRead + AsyncWrite + Unpin {
 
 impl<T> AsyncRead for StreamIo<T>
 where T: AsyncRead + AsyncWrite + Unpin {
-    #[log(Trace)]
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -42,7 +41,6 @@ where T: AsyncRead + AsyncWrite + Unpin {
 
 impl <T> AsyncWrite for StreamIo<T>
 where T: AsyncRead + AsyncWrite + Unpin {
-    #[log(Trace)]
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -54,7 +52,6 @@ where T: AsyncRead + AsyncWrite + Unpin {
         }
     }
 
-    #[log(Trace)]
     fn poll_flush(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>
@@ -65,7 +62,6 @@ where T: AsyncRead + AsyncWrite + Unpin {
         }
     }
 
-    #[log(Trace)]
     fn poll_close(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>
