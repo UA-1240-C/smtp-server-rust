@@ -8,3 +8,5 @@ futures = "0.3.18"
 async-native-tls = "0.3"
 native-tls = "0.2.7"
 async-io = "2.3.4"
+logger = { path = "../logger" }
+logger_proc_macro = { path = "../logger_proc_macro" }

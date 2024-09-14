@@ -1,11 +1,18 @@
-use std::thread;
+use std::{fmt::Debug, thread};
 use crossbeam::channel::{unbounded, Sender, Receiver};
+use logger::{
+    info,
+    error,
+};
+use logger_proc_macro::*;
 
+#[derive(Debug)]
 pub struct ThreadPool {
     workers: Vec<Worker>,
     sender: Sender<Message>,
 }
 
+#[derive(Debug)]
 struct Worker {
     id: usize,
     thread: Option<thread::JoinHandle<()>>,
@@ -19,6 +26,7 @@ pub enum Message {
 type Job = Box<dyn FnOnce() + Send + 'static>;
 
 impl ThreadPool {
+    #[log(Trace)]
     pub fn new(size: usize) -> ThreadPool {
         let (sender, receiver) = unbounded();
         let mut workers = Vec::with_capacity(size);
@@ -29,27 +37,30 @@ impl ThreadPool {
         ThreadPool { workers, sender }
     }
 
+    #[log(Debug)]
     pub fn execute<F>(&self, f: F)
     where
-        F: Fn() + Send + 'static
+        F: Fn() + Send + 'static,
     {
         let job = Box::new(f);
         let _ = self.sender.send(Message::NewJob(job));
     }
 
+    #[log(Trace)]
     pub fn workers_count(&self) -> usize {
         self.workers.len()
     }
 }
 
 impl Drop for ThreadPool {
+    #[log(Debug)]
     fn drop(&mut self) {
         for _ in &self.workers {
             let _ = self.sender.send(Message::Terminate);
         }
 
         for worker in &mut self.workers {
-            println!("Shutting down worker {}", worker.id);
+            info!("Shutting down worker {}", worker.id);
 
             if let Some(thread) = worker.thread.take() {
                 let _ = thread.join();
@@ -66,21 +77,18 @@ impl Worker {
             let message = match message {
                 Ok(message) => message,
                 Err(_) => {
-                    println!("
-                        Error occurred while receiving message. \
-                        Worker {}. \
-                        Trying again...", id);
+                    error!("Error occurred while receiving message. Worker {}. Trying again...", id);
                     continue;
                 }
             };
 
             match message {
                 Message::NewJob(job) => {
-                    println!("Worker {} got a job. Executing...", id);
+                    info!("Worker {} got a job. Executing...", id);
                     job();
                 }
                 Message::Terminate => {
-                    println!("Worker {} was told to terminate.", id);
+                    info!("Worker {} was told to terminate.", id);
                     break;
                 }
             }

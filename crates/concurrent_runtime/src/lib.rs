@@ -7,22 +7,28 @@ use futures::{
 use crossbeam::{epoch::{pin, Atomic}, queue::SegQueue};
 mod threadpool;
 
+use logger::info;
+use logger_proc_macro::*;
+
 type Task = BoxFuture<'static, ()>;
 type GlobalTaskQueue = SegQueue<Task>;
 
+#[derive(Debug)]
 pub struct Executor {
     global_queue: Arc<GlobalTaskQueue>,
     termination_flag: Arc<AtomicBool>,
 }
 
 impl Executor {
+    #[log(Trace)]
     fn new(global_queue: Arc<GlobalTaskQueue>) -> Self {
         Executor {
             global_queue,
             termination_flag: Arc::new(AtomicBool::new(false)),
         }
     }
-
+    
+    #[log(Trace)]
     fn run(&mut self) {
         loop {
             if !self.termination_flag.load(Ordering::Relaxed) {
@@ -31,7 +37,7 @@ impl Executor {
                     let mut context = Context::from_waker(waker);
 
                     match task.as_mut().poll(&mut context) {
-                        Poll::Ready(_) => println!("Async coroutine finished"),
+                        Poll::Ready(_) => info!("Async coroutine finished"),
                         Poll::Pending => self.global_queue.push(task),
                     }
                 }
@@ -39,17 +45,20 @@ impl Executor {
         }
     }
 
+    #[log(Trace)]
     fn stop(&mut self) {
         self.termination_flag.store(true, Ordering::Relaxed);
     }
 }
 
+#[derive(Debug)]
 struct ExecutorManager {
     executors: Vec<Arc<Atomic<Executor>>>,
     global_async_queue: Arc<GlobalTaskQueue>,
 }
 
 impl ExecutorManager {
+    #[log(Trace)]
     fn new() -> Self {
         ExecutorManager {
             executors: Vec::new(),
@@ -57,6 +66,7 @@ impl ExecutorManager {
         }
     }
 
+    #[log(Trace)]
     fn create_executor(&mut self) -> Arc<Atomic<Executor>> {
         let executor = Arc::new(Atomic::new(Executor::new(
             self.global_async_queue.clone()
@@ -66,10 +76,12 @@ impl ExecutorManager {
         executor
     }
 
+    #[log(Debug)]
     fn create_async_task(&self, task: Task) {
         self.global_async_queue.push(task);
     }
     
+    #[log(Trace)]
     fn stop(&mut self) {
         for executor in self.executors.clone() {
             let guard = pin();
@@ -81,7 +93,8 @@ impl ExecutorManager {
 
 impl Index<usize> for ExecutorManager {
     type Output = Arc<Atomic<Executor>>;
-
+    
+    #[log(Trace)]
     fn index(&self, index: usize) -> &Arc<Atomic<Executor>> {
         self.executors
             .get(index)
@@ -89,12 +102,14 @@ impl Index<usize> for ExecutorManager {
     }
 }
 
+#[derive(Debug)]
 pub struct ConcurrentRuntime {
     executors_manager: ExecutorManager,
     threadpool: threadpool::ThreadPool,
 }
 
 impl ConcurrentRuntime {
+    #[log(Trace)]
     pub fn new(num_threads: usize) -> Self {
         let executors_manager = ExecutorManager::new();
         let threadpool = threadpool::ThreadPool::new(num_threads);
@@ -105,6 +120,7 @@ impl ConcurrentRuntime {
         }
     }
 
+    #[log(Trace)]
     pub fn start(&mut self) {
         for _ in 0..self.threadpool.workers_count() {
             let executor = self.executors_manager.create_executor();
@@ -119,6 +135,7 @@ impl ConcurrentRuntime {
         }
     }
 
+    #[log(Debug)]
     pub fn spawn<F>(&self, future: F)
     where
         F: Future<Output = ()> + Send + 'static
@@ -127,6 +144,7 @@ impl ConcurrentRuntime {
         self.executors_manager.create_async_task(task);
     }
 
+    #[log(Trace)]
     pub fn stop(&mut self) {
         self.executors_manager.stop();
     }

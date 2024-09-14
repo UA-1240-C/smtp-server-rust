@@ -6,3 +6,5 @@ edition = "2021"
 [dependencies]
 futures = "0.3.18"
 crossbeam = "0.8.0"
+logger = { path = "../logger" }
+logger_proc_macro = { path = "../logger_proc_macro" }

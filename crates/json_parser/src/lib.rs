@@ -5,6 +5,8 @@ use std::collections::HashMap;
 pub mod error;
 pub use error::JsonError;
 
+use logger_proc_macro::*;
+
 #[derive(Debug)]
 pub enum JsonValue {
     Object(HashMap<String, JsonValue>),
@@ -16,14 +18,16 @@ pub enum JsonValue {
 }
 
 impl JsonValue {
-    pub fn as_str(&self) -> Option<&str> {
+    #[log(Trace)]
+    pub fn as_str(&self) -> Option<String> {
         if let JsonValue::String(s) = self {
-            Some(s)
+            Some(s.to_string())
         } else {
             None
         }
     }
 
+    #[log(Trace)]
     pub fn as_number(&self) -> Option<f64> {
         if let JsonValue::Number(n) = self {
             Some(*n)
@@ -32,6 +36,7 @@ impl JsonValue {
         }
     }
 
+    #[log(Trace)]
     pub fn as_array(&self) -> Option<&Vec<JsonValue>> {
         if let JsonValue::Array(arr) = self {
             Some(arr)
@@ -40,6 +45,7 @@ impl JsonValue {
         }
     }
 
+    #[log(Trace)]
     pub fn as_object(&self) -> Option<&HashMap<String, JsonValue>> {
         if let JsonValue::Object(obj) = self {
             Some(obj)
@@ -48,6 +54,7 @@ impl JsonValue {
         }
     }
 
+    #[log(Trace)]
     pub fn as_bool(&self) -> Option<bool> {
         if let JsonValue::Bool(b) = self {
             Some(*b)
@@ -59,7 +66,8 @@ impl JsonValue {
 
 impl Index<&str> for JsonValue {
     type Output = JsonValue;
-
+    
+    #[log(Trace)]
     fn index(&self, key: &str) -> &Self::Output {
         if let JsonValue::Object(map) = self {
             map.get(key).unwrap_or(&JsonValue::Null)
@@ -72,6 +80,7 @@ impl Index<&str> for JsonValue {
 impl Index<usize> for JsonValue {
     type Output = JsonValue;
 
+    #[log(Trace)]
     fn index(&self, index: usize) -> &Self::Output {
         if let JsonValue::Array(arr) = self {
             arr.get(index).unwrap_or(&JsonValue::Null)
@@ -86,6 +95,7 @@ pub struct JsonParser {
 }
 
 impl JsonParser {
+    #[log(Trace)]
     pub fn parse(&mut self, code: &str) -> std::result::Result<JsonValue, JsonError> {
         let tree = self.parser.parse(code, None).ok_or(JsonError::ParseError)?;
         let root_node = tree.root_node();
@@ -96,6 +106,7 @@ impl JsonParser {
         Ok(json_value)
     }
 
+    #[log(Trace)]
     pub fn parse_json_node(node: Node, code: &str) -> std::result::Result<JsonValue, JsonError> {
         match node.kind() {
             "object" => {
@@ -146,6 +157,7 @@ impl JsonParser {
         }
     }
 
+    #[log(Trace)]
     pub fn parse_pair(node: Node, code: &str) -> Result<(String, JsonValue), JsonError> {
         let mut cursor = node.walk();
         cursor.goto_first_child();
@@ -160,6 +172,7 @@ impl JsonParser {
 }
 
 impl Default for JsonParser {
+    #[log(Debug)]
     fn default() -> Self {
         let mut parser = tree_sitter::Parser::new();
         let language = tree_sitter_json::language();
@@ -184,6 +197,6 @@ mod tests {
 
         let json_node = JsonParser::parse_pair(root_node, code).unwrap();
         assert_eq!(json_node.0, "key");
-        assert_eq!(json_node.1.as_str(), Some("value"));
+        assert_eq!(json_node.1.as_str(), Some("value".to_string()));
     }
 }

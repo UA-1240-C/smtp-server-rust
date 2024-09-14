@@ -8,11 +8,14 @@ use futures::{
     AsyncWriteExt,
     io::{AsyncRead, AsyncWrite},
 };
+
 use async_io::Async;
 use async_native_tls::{TlsConnector, TlsAcceptor, TlsStream};
 
 pub mod error;
 use error::{SmartStreamError, TlsError};
+
+use logger_proc_macro::*;
 
 type AsyncTcpStream = Async<std::net::TcpStream>;
 
@@ -24,6 +27,7 @@ where T: AsyncRead + AsyncWrite + Unpin {
 
 impl<T> AsyncRead for StreamIo<T>
 where T: AsyncRead + AsyncWrite + Unpin {
+    #[log(Trace)]
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -38,6 +42,7 @@ where T: AsyncRead + AsyncWrite + Unpin {
 
 impl <T> AsyncWrite for StreamIo<T>
 where T: AsyncRead + AsyncWrite + Unpin {
+    #[log(Trace)]
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -49,6 +54,7 @@ where T: AsyncRead + AsyncWrite + Unpin {
         }
     }
 
+    #[log(Trace)]
     fn poll_flush(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>
@@ -58,7 +64,8 @@ where T: AsyncRead + AsyncWrite + Unpin {
             Self::Encrypted(ref mut stream) => Pin::new(stream).poll_flush(cx),
         }
     }
-    
+
+    #[log(Trace)]
     fn poll_close(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>
@@ -75,8 +82,8 @@ pub struct AsyncStream {
     m_buffsize: u16,
 }
 
-#[allow(dead_code)]
 impl AsyncStream {
+    #[log(Debug)]
     pub fn new(stream: TcpStream) -> Result<Self, SmartStreamError> {
         let stream = Async::new(stream).map_err(SmartStreamError::from)?;
         Ok(
@@ -87,6 +94,7 @@ impl AsyncStream {
         )
     }
 
+    #[log(Trace)]
     pub fn close(&mut self) {
         if let Some(stream) =  self.m_stream.as_mut() { 
             match stream {
@@ -101,6 +109,7 @@ impl AsyncStream {
         self.m_stream.take();
     }
 
+    #[log(Trace)]
     pub fn is_open(&self) -> bool {
         match &self.m_stream {
             Some(stream) => {
@@ -113,12 +122,14 @@ impl AsyncStream {
         }
     }
 
+    #[log(Trace)]
     pub async fn connect_tls(&mut self) -> Result<(), SmartStreamError> {
         if !self.is_open() {
             return Err(SmartStreamError::ClosedConnection("Error on connect_tls occured".to_string()));
         }
 
-        let stream = self.m_stream.take().ok_or(SmartStreamError::RuntimeError("Error taking stream from option".to_string()))?;
+        let stream = self.m_stream.take()
+            .ok_or(SmartStreamError::RuntimeError("Error taking stream from option".to_string()))?;
 
         let connector = TlsConnector::new()
             .danger_accept_invalid_certs(true)
@@ -139,12 +150,14 @@ impl AsyncStream {
         Ok(())
     }
 
+    #[log(Trace)]
     pub async fn accept_tls(&mut self, acceptor: &TlsAcceptor) -> Result<(), SmartStreamError> {
         if !self.is_open() {
             return Err(SmartStreamError::ClosedConnection("Error on accept_tls occured".to_string()));
         }
 
-        let stream = self.m_stream.take().ok_or(SmartStreamError::RuntimeError("Error taking stream from option".to_string()))?;
+        let stream = self.m_stream.take()
+            .ok_or(SmartStreamError::RuntimeError("Error taking stream from option".to_string()))?;
 
         let stream = match stream {
             StreamIo::Plain(stream) => {
@@ -160,6 +173,7 @@ impl AsyncStream {
         Ok(())
     }
 
+    #[log(Trace)]
     pub async fn write(&mut self, buf: &[u8]) -> Result<usize, SmartStreamError> {
         if self.is_open() {
             match self.m_stream.as_mut() {
@@ -171,6 +185,7 @@ impl AsyncStream {
         }
     }
 
+    #[log(Trace)]
     pub async fn read(&mut self) -> Result<String, SmartStreamError> {
         if self.is_open() {
             self.read_until_crlf().await
@@ -179,6 +194,7 @@ impl AsyncStream {
         }
     }
 
+    #[log(Trace)]
     async fn read_until_crlf(&mut self) -> Result<String, SmartStreamError> {
         let mut response = String::new();
         let mut buffer: Vec<u8> = vec![0; self.m_buffsize as usize];
@@ -207,6 +223,7 @@ impl AsyncStream {
 }
 
 impl Drop for AsyncStream {
+    #[log(Debug)]
     fn drop(&mut self) {
         if let Some(stream) =  self.m_stream.as_mut() { 
             match stream {

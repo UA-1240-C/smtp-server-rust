@@ -126,7 +126,6 @@ mod tests {
         let mut perser = JsonParser::default();
         let json_parse_result = perser.parse(code);
 
-        println!("{:?}", json_parse_result);
         assert!(json_parse_result.is_err());
     }
 

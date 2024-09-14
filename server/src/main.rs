@@ -1,5 +1,3 @@
-use std::thread;
-
 use concurrent_runtime::ConcurrentRuntime;
 
 use logger_proc_macro::*;
