@@ -1,0 +1,9 @@
+[package]
+name = "smtp_server"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+concurrent_runtime = { path = "../concurrent_runtime" }
+async-io = "1.11.0"
+futures = "0.3.18"

@@ -1,0 +1,8 @@
+[package]
+name = "concurrent_runtime"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+futures = "0.3.18"
+crossbeam = "0.8.0"
