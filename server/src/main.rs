@@ -10,6 +10,8 @@ mod config;
 
 use logger::info;
 
+use client_session::ClientSession;
+
 use dotenv::dotenv;
 use std::env;
 
@@ -43,7 +45,7 @@ fn main() {
 
         runtime.spawn(async move {
             let connection_string = env::var("CONNECTION_STRING").expect("CONNECTION_STRING must be set");
-            let connection_result = client_connection::ClientConnection::new(
+            let connection_result = ClientSession::new(
                 async_stream, &acceptor,
                 &connection_string
             );

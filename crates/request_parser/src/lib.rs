@@ -72,6 +72,7 @@ impl RequestType {
 
         request_res
     }
+    
     #[log(trace)]
     fn parse_command_with_arg<I: SliceIndex<str> + Debug>(cmd_type: fn(String) -> RequestType, raw_request: &str, slice: I) -> Result<RequestType, String> 
     where

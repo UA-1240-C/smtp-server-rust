@@ -10,7 +10,7 @@ smart_stream = { path = "../crates/smart_stream" }
 mail_database = { path = "../crates/mail_database" }
 async-native-tls = "0.3.0"
 native-tls = "0.2.7"
-client_connection = { path = "../crates/client_connection" }
+client_session = { path = "../crates/client_session" }
 logger = { path = "../crates/logger" }
 logger_proc_macro = { path = "../crates/logger_proc_macro" }
 dotenv = "0.15.0"
