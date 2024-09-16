@@ -81,7 +81,7 @@ impl RequestType {
         if let Some(argument) = argument {
             Ok(cmd_type(argument.to_string()))
         } else {
-            RequestType::argument_parsing_error(&cmd_type(String::new().into()).to_string())
+            RequestType::argument_parsing_error(&cmd_type(String::new()).to_string())
         }
     }
 
@@ -113,7 +113,7 @@ mod tests {
     fn test_parse_helo_err() {
         // HELO and EHLO must have the argument part
         let request = RequestType::parse("HELO");
-        assert_eq!(request.is_err(), true);
+        assert!(request.is_err());
     }
 
     #[test]
