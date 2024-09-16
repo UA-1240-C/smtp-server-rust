@@ -43,9 +43,19 @@ fn main() {
 
         runtime.spawn(async move {
             let connection_string = env::var("CONNECTION_STRING").expect("CONNECTION_STRING must be set");
-            let mut connection = client_connection::ClientConnection::new(async_stream, &acceptor, &connection_string);
-            match connection.run().await {
-                Ok(_) => info!("Connection closed"),
+            let connection_result = client_connection::ClientConnection::new(
+                async_stream, &acceptor,
+                &connection_string
+            );
+
+            match connection_result {
+                Ok(mut connection) => {
+                    let connection_promise = connection.run().await;
+                    match connection_promise {
+                        Ok(_) => info!("Connection closed"),
+                        Err(e) => info!("Connection error: {:?}", e),
+                    }
+                },
                 Err(e) => info!("Connection error: {:?}", e),
             }
         });
