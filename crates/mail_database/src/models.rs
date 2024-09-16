@@ -39,7 +39,7 @@ pub struct NewUser<'a> {
 }
 
 #[derive(Insertable)]
-#[diesel(table_name = crate::schema::emailMessages)]
+#[diesel(table_name = crate::schema::email_messages)]
 pub struct NewMail<'a> {
     pub sender_id: i32,
     pub recipient_id: i32,

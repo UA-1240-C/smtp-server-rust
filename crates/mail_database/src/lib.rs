@@ -32,6 +32,9 @@ pub enum MailError {
     #[error("User is not logged in failed")]
     UserNotLoggedIn,
 
+    #[error("There are no receivers")]
+    EmptyReceiversError,
+
     #[error("Password hashing error")]
     PasswordHashError,
 
@@ -52,16 +55,16 @@ pub trait IMailDB {
 
 // PostgreSQL MailDB implementation using Diesel
 #[derive(Default)]
-pub struct PgMailDB<'a> {
+pub struct PgMailDB {
     host_name: String,
     host_id: u32,
     user_name: Option<String>,
     user_id: Option<u32>,
     conn: Option<PgConnection>,
-    hash_algorithm : Argon2<'a>,
+    hash_algorithm : Argon2<'static>,
 }
 
-impl<'a> PgMailDB<'a> {
+impl PgMailDB {
     pub fn new(host_name: String) -> Self {
         let argon2 = Argon2::new(Algorithm::Argon2id,
             Version::V0x13,
@@ -101,7 +104,7 @@ impl<'a> PgMailDB<'a> {
     }
 }
 
-impl<'a> IMailDB for PgMailDB<'a> {
+impl IMailDB for PgMailDB {
     fn connect(&mut self, connection_string: &str) -> Result<(), MailError> {        
         self.conn = Some(PgConnection::establish(connection_string)?);
         
@@ -192,10 +195,13 @@ impl<'a> IMailDB for PgMailDB<'a> {
         if self.user_id.is_none() || self.user_name.is_none() {
             return Err(MailError::UserNotLoggedIn);
         }
+        if receivers.is_empty() {
+            return Err(MailError::EmptyReceiversError);
+        }
 
         use crate::schema::users::dsl::*;
-        use crate::schema::mailBodies::dsl::*;
-        use crate::schema::emailMessages;
+        use crate::schema::mail_bodies::dsl::*;
+        use crate::schema::email_messages;
         use crate::models::NewMail;
 
         self.conn.as_mut().ok_or_else(|| MailError::NoConnection)?
@@ -213,7 +219,7 @@ impl<'a> IMailDB for PgMailDB<'a> {
                     receiver_ids.push(receiver_id);
                 }
 
-                let body_id: i32 =  diesel::insert_into(mailBodies)
+                let body_id: i32 =  diesel::insert_into(mail_bodies)
                     .values(body_content.eq(body))
                     .returning(mail_body_id)
                     .get_result(connection)?;
@@ -226,7 +232,7 @@ impl<'a> IMailDB for PgMailDB<'a> {
                         mail_body_id : body_id,
                         is_received: false
                     };
-                    diesel::insert_into(emailMessages::table)
+                    diesel::insert_into(email_messages::table)
                         .values(new_mail)
                         .execute(connection)?;
                 }
