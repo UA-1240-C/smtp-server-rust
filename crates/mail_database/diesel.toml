@@ -1,0 +1,9 @@
+# For documentation on how to configure this file,
+# see https://diesel.rs/guides/configuring-diesel-cli
+
+[print_schema]
+file = "crates/mail_database/schema.rs"
+custom_type_derives = ["diesel::query_builder::QueryId", "Clone"]
+
+[migrations_directory]
+dir = "C:\\Users\\Admin\\Documents\\VS code projects\\smtp-server-rust\\migrations"

@@ -1,7 +1,8 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    emailMessages (email_message_id) {
+    #[sql_name = "emailMessages"]
+    email_messages (email_message_id) {
         email_message_id -> Int4,
         sender_id -> Nullable<Int4>,
         recipient_id -> Nullable<Int4>,
@@ -22,7 +23,8 @@ diesel::table! {
 }
 
 diesel::table! {
-    mailBodies (mail_body_id) {
+    #[sql_name = "mailBodies"]
+    mail_bodies (mail_body_id) {
         mail_body_id -> Int4,
         body_content -> Text,
     }
@@ -39,12 +41,12 @@ diesel::table! {
     }
 }
 
-diesel::joinable!(emailMessages -> mailBodies (mail_body_id));
+diesel::joinable!(email_messages -> mail_bodies (mail_body_id));
 diesel::joinable!(users -> hosts (host_id));
 
 diesel::allow_tables_to_appear_in_same_query!(
-    emailMessages,
+    email_messages,
     hosts,
-    mailBodies,
+    mail_bodies,
     users,
 );
