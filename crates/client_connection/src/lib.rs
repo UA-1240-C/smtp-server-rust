@@ -38,17 +38,18 @@ pub struct ClientConnection<'a> {
 
 impl ClientConnection<'_> {
     #[log(debug)]
-    pub fn new(connection: AsyncStream, tls_acceptor: &TlsAcceptor, connection_string: &str) -> Self {
+    pub fn new(connection: AsyncStream, tls_acceptor: &TlsAcceptor, connection_string: &str)
+    -> Result<Self, ClientConnectionError> {
         let mut pg = PgMailDB::new("localhost".to_string());
-        pg.connect(connection_string);
+        pg.connect(connection_string)?;
         
-        Self {
+        Ok(Self {
             current_state: ClientState::Connected,
             connection: Some(connection),
             connection_data: ConnectionData::default(),
             tls_acceptor: tls_acceptor.clone(),
             db_connection: pg,
-        }
+        })
     }
     #[log(trace)]
     async fn handle_new_request(&mut self) -> Result<(), ClientConnectionError> {
@@ -75,7 +76,7 @@ impl ClientConnection<'_> {
                 }
             },
             Err(err) => {
-                connection.write([b"500 Error\r\n", err.as_bytes()].concat().as_ref()).await?;
+                connection.write(format!("500 Error {}\r\n", err).as_bytes()).await?;
             }
         }
         Ok(())
