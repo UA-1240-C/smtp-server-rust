@@ -8,7 +8,7 @@ json_parser = { path = "../crates/json_parser" }
 concurrent_runtime = { path = "../crates/concurrent_runtime" }
 smart_stream = { path = "../crates/smart_stream" }
 mail_database = { path = "../crates/mail_database" }
-async-native-tls = "0.3.0"
+async-native-tls = "0.5.0"
 native-tls = "0.2.7"
 client_session = { path = "../crates/client_session" }
 logger = { path = "../crates/logger" }
