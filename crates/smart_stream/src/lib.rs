@@ -2,7 +2,7 @@ use std::{
     io::ErrorKind, net::TcpStream, pin::Pin, task::{Context, Poll}
 };
 use futures::{
-    io::{AsyncRead, AsyncWrite}, AsyncReadExt, AsyncWriteExt,
+    io::{AsyncRead, AsyncWrite}, AsyncReadExt, AsyncWriteExt
 };
 
 use async_io::Async;
@@ -114,11 +114,11 @@ impl AsyncStream {
                 match bytes_read_result {
                     Ok(bytes_read) => bytes_read > 0,
                     Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
-                        warn!("No data available yet, try again later.");
+                        //warn!("No data available yet, try again later.");
                         true
                     }
                     Err(e) => {
-                        error!("Error on check is_open: {:?}", e);
+                        //error!("Error on check is_open: {:?}", e);
                         false
                     }
                 }
