@@ -12,6 +12,6 @@
         "cache-capacity": 1
     },
     "thread-pool": {
-        "pool-size": 2,
+        "pool-size": 1,
     },
 }

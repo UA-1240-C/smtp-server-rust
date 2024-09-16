@@ -87,12 +87,13 @@ impl ClientSession<'_> {
     pub async fn run(&mut self) -> Result<(), ClientSessionError> {
         let connection = self.connection.as_mut().ok_or(ClientSessionError::ClosedConnection)?;
         connection.write(b"220 SMTP server ready\r\n").await?;
-        loop {
-            if self.connection.is_none() {
-                return Ok(());
+        while let Some(connection) = &self.connection {
+            if !connection.is_open() {
+                break;
             }
             self.handle_new_request().await?;
         }
+        Ok(())
     }
 
     #[log(trace)]

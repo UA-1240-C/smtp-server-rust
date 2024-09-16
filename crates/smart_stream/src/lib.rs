@@ -1,12 +1,8 @@
 use std::{
-    task::{Poll, Context},
-    pin::Pin,
-    net::TcpStream,
+    io::ErrorKind, net::TcpStream, pin::Pin, task::{Context, Poll}
 };
 use futures::{
-    AsyncReadExt,
-    AsyncWriteExt,
-    io::{AsyncRead, AsyncWrite},
+    io::{AsyncRead, AsyncWrite}, AsyncReadExt, AsyncWriteExt,
 };
 
 use async_io::Async;
@@ -16,17 +12,18 @@ pub mod error;
 use error::{SmartStreamError, TlsError};
 
 use logger_proc_macro::*;
+use logger::{warn, error};
 
 type AsyncTcpStream = Async<std::net::TcpStream>;
 
 pub enum StreamIo<T>
-where T: AsyncRead + AsyncWrite + Unpin {
+where T: AsyncReadExt + AsyncWriteExt + Unpin {
     Plain(T),
     Encrypted(TlsStream<T>),
 }
 
 impl<T> AsyncRead for StreamIo<T>
-where T: AsyncRead + AsyncWrite + Unpin {
+where T: AsyncReadExt + AsyncWriteExt + Unpin {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -40,7 +37,7 @@ where T: AsyncRead + AsyncWrite + Unpin {
 }
 
 impl <T> AsyncWrite for StreamIo<T>
-where T: AsyncRead + AsyncWrite + Unpin {
+where T: AsyncReadExt + AsyncWriteExt + Unpin {
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -109,9 +106,21 @@ impl AsyncStream {
     pub fn is_open(&self) -> bool {
         match &self.m_stream {
             Some(stream) => {
-                match stream {
-                    StreamIo::Plain(stream) => stream.get_ref().peer_addr().is_ok(),
-                    StreamIo::Encrypted(stream) => stream.get_ref().get_ref().peer_addr().is_ok(),
+                let bytes_read_result = match stream {
+                    StreamIo::Plain(stream) => stream.get_ref().peek(&mut [0, 8]),
+                    StreamIo::Encrypted(stream) => stream.get_ref().get_ref().peek(&mut [0, 8]),
+                };
+
+                match bytes_read_result {
+                    Ok(bytes_read) => bytes_read > 0,
+                    Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
+                        warn!("No data available yet, try again later.");
+                        true
+                    }
+                    Err(e) => {
+                        error!("Error on check is_open: {:?}", e);
+                        false
+                    }
                 }
             }
             None => false,
@@ -184,7 +193,7 @@ impl AsyncStream {
     #[log(Trace)]
     pub async fn read(&mut self) -> Result<String, SmartStreamError> {
         if self.is_open() {
-            self.read_until_crlf().await
+            Ok(self.read_until_crlf().await?)
         } else {
             Err(SmartStreamError::ClosedConnection("Error on read occured".to_string()))
         }
@@ -201,8 +210,11 @@ impl AsyncStream {
                 break;
             }
 
-            if let Some(stream) = self.m_stream.as_mut() {
+            if let Some(stream) = self.m_stream.as_mut() { 
                 bytes_read = stream.read(&mut buffer).await?;
+                if bytes_read == 0 {
+                    break;
+                }
             } else {
                 break;
             }
@@ -210,10 +222,11 @@ impl AsyncStream {
             let chunk = &buffer[..bytes_read];
             response.push_str(&String::from_utf8_lossy(chunk));
 
-            if response.ends_with("\r\n") {
+            if chunk.ends_with(b"\r\n") {
                 break;
             }
         }
+
         Ok(response)
     }
 }
