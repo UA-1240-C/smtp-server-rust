@@ -8,10 +8,13 @@
     "logging": {
         "log-target": "console",
         "file-path": "smtp34.log",
-        "log-level": "trace",
+        "log-level": "debug",
         "cache-capacity": 1
     },
     "thread-pool": {
         "pool-size": 1,
+    },
+    "communication": {
+        "max-connection-timeout": 300
     },
 }

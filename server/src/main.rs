@@ -17,7 +17,7 @@ use std::env;
 
 fn main() {
     dotenv().ok();
-    logger::set_logger_level(logger::LogLevel::Trace);
+
     logger::set_logger_target(Box::new(logger::ConsoleLogTarget));
 
     let cfg = config::Config::default();
@@ -40,7 +40,7 @@ fn main() {
     let acceptor = Arc::new(TlsAcceptor::from(native_tls_acceptor));
     loop {
         let (stream, _) = listener.accept().unwrap();
-        let async_stream = AsyncStream::new(stream).unwrap();
+        let async_stream = AsyncStream::new(stream, cfg.timeout).unwrap();
         let acceptor = acceptor.clone();
 
         runtime.spawn(async move {
