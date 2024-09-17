@@ -1,29 +1,25 @@
 use std::{
-    io::ErrorKind, net::TcpStream, pin::Pin, task::{Context, Poll}
-};
-use futures::{
-    io::{AsyncRead, AsyncWrite}, AsyncReadExt, AsyncWriteExt
+    net::TcpStream, pin::Pin, task::{Context, Poll}
 };
 
-use async_io::Async;
+use async_std::{
+    io::{Read, ReadExt, Write, WriteExt, BufReader}, net::TcpStream as AsyncTcpStream,
+};
 use async_native_tls::{TlsConnector, TlsAcceptor, TlsStream};
 
 pub mod error;
 use error::{SmartStreamError, TlsError};
 
 use logger_proc_macro::*;
-use logger::{warn, error};
-
-type AsyncTcpStream = Async<std::net::TcpStream>;
 
 pub enum StreamIo<T>
-where T: AsyncReadExt + AsyncWriteExt + Unpin {
+where T: Read + Write + Unpin {
     Plain(T),
     Encrypted(TlsStream<T>),
 }
 
-impl<T> AsyncRead for StreamIo<T>
-where T: AsyncReadExt + AsyncWriteExt + Unpin {
+impl<T> Read for StreamIo<T>
+where T: Read + Write + Unpin {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -36,8 +32,8 @@ where T: AsyncReadExt + AsyncWriteExt + Unpin {
     }
 }
 
-impl <T> AsyncWrite for StreamIo<T>
-where T: AsyncReadExt + AsyncWriteExt + Unpin {
+impl <T> Write for StreamIo<T>
+where T: Read + Write + Unpin {
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -78,7 +74,7 @@ pub struct AsyncStream {
 impl AsyncStream {
     #[log(Debug)]
     pub fn new(stream: TcpStream) -> Result<Self, SmartStreamError> {
-        let stream = Async::new(stream).map_err(SmartStreamError::from)?;
+        let stream = AsyncTcpStream::from(stream);
         Ok(
             Self {
                 m_stream: Some(StreamIo::Plain(stream)),
@@ -92,10 +88,10 @@ impl AsyncStream {
         if let Some(stream) =  self.m_stream.as_mut() { 
             match stream {
                 StreamIo::Plain(stream) => {
-                    let _ = stream.get_ref().shutdown(std::net::Shutdown::Both);
+                    let _ = stream.shutdown(std::net::Shutdown::Both);
                 }
                 StreamIo::Encrypted(stream) => {
-                    let _ = stream.get_ref().get_ref().shutdown(std::net::Shutdown::Both);
+                    let _ = stream.get_ref().shutdown(std::net::Shutdown::Both);
                 }
             }
         }
@@ -106,21 +102,9 @@ impl AsyncStream {
     pub fn is_open(&self) -> bool {
         match &self.m_stream {
             Some(stream) => {
-                let bytes_read_result = match stream {
-                    StreamIo::Plain(stream) => stream.get_ref().peek(&mut [0, 8]),
-                    StreamIo::Encrypted(stream) => stream.get_ref().get_ref().peek(&mut [0, 8]),
-                };
-
-                match bytes_read_result {
-                    Ok(bytes_read) => bytes_read > 0,
-                    Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
-                        //warn!("No data available yet, try again later.");
-                        true
-                    }
-                    Err(e) => {
-                        //error!("Error on check is_open: {:?}", e);
-                        false
-                    }
+                match stream {
+                    StreamIo::Plain(stream) => stream.peer_addr().is_ok(),
+                    StreamIo::Encrypted(stream) => stream.get_ref().peer_addr().is_ok(),
                 }
             }
             None => false,
@@ -142,7 +126,7 @@ impl AsyncStream {
 
         let stream = match stream {
             StreamIo::Plain(stream) => {
-                let domain = stream.get_ref().peer_addr()?.ip().to_string();
+                let domain = stream.peer_addr()?.ip().to_string();
                 let stream = connector.connect(domain, stream).await?;
                 StreamIo::Encrypted(stream)
             }
@@ -182,7 +166,7 @@ impl AsyncStream {
     pub async fn write(&mut self, buf: &[u8]) -> Result<usize, SmartStreamError> {
         if self.is_open() {
             match self.m_stream.as_mut() {
-                Some(stream) => stream.write(buf).await.map_err(SmartStreamError::from),
+                Some(stream) => stream.write(buf.as_ref()).await.map_err(SmartStreamError::from),
                 None => Err(SmartStreamError::RuntimeError("Error getting mutable reference on try to write".to_string())),
             }
         } else {
@@ -193,41 +177,34 @@ impl AsyncStream {
     #[log(Trace)]
     pub async fn read(&mut self) -> Result<String, SmartStreamError> {
         if self.is_open() {
-            Ok(self.read_until_crlf().await?)
+            Ok(self.read_all().await?)
         } else {
             Err(SmartStreamError::ClosedConnection("Error on read occured".to_string()))
         }
     }
 
     #[log(Trace)]
-    async fn read_until_crlf(&mut self) -> Result<String, SmartStreamError> {
-        let mut response = String::new();
-        let mut buffer: Vec<u8> = vec![0; self.m_buffsize as usize];
-        let mut bytes_read: usize;
+    async fn read_all(&mut self) -> Result<String, SmartStreamError> {
+        if let Some(stream) = self.m_stream.as_mut() {
+            let mut reader = BufReader::new(stream);
+            let mut response = Vec::new();
 
-        loop {
-            if !self.is_open() {
-                break;
-            }
+            let mut chunk = vec![0; self.m_buffsize as usize];
 
-            if let Some(stream) = self.m_stream.as_mut() { 
-                bytes_read = stream.read(&mut buffer).await?;
-                if bytes_read == 0 {
+            loop {
+                let n = reader.read(&mut chunk).await?;
+
+                response.extend_from_slice(&chunk[..n]);
+                
+                if String::from_utf8(response.clone()).unwrap().ends_with("\r\n") {
                     break;
                 }
-            } else {
-                break;
             }
-            
-            let chunk = &buffer[..bytes_read];
-            response.push_str(&String::from_utf8_lossy(chunk));
 
-            if chunk.ends_with(b"\r\n") {
-                break;
-            }
+            Ok(String::from_utf8(response).unwrap())
+        } else {
+            Err(SmartStreamError::RuntimeError("Error getting mutable reference on try to read".to_string()))
         }
-
-        Ok(response)
     }
 }
 
@@ -237,10 +214,10 @@ impl Drop for AsyncStream {
         if let Some(stream) =  self.m_stream.as_mut() { 
             match stream {
                 StreamIo::Plain(stream) => {
-                    let _ = stream.get_ref().shutdown(std::net::Shutdown::Both);
+                    let _ = stream.shutdown(std::net::Shutdown::Both);
                 }
                 StreamIo::Encrypted(stream) => {
-                    let _ = stream.get_ref().get_ref().shutdown(std::net::Shutdown::Both);
+                    let _ = stream.get_ref().shutdown(std::net::Shutdown::Both);
                 }
             }
         }
