@@ -53,9 +53,11 @@ impl RequestType {
         } else if raw_request.starts_with(REGISTER) {
             request_res =  RequestType::parse_command_with_arg(RequestType::REGISTER, raw_request, REGISTER.len() + 1..);
         } else if raw_request.starts_with(MAIL_FROM) {
-            request_res =  RequestType::parse_command_with_arg(RequestType::MAIL_FROM, raw_request, MAIL_FROM.len() + 3..raw_request.len() - 1);
+            let trimmed_request = &Self::remove_whitespace(&raw_request[MAIL_FROM.len()..]);
+            request_res =  RequestType::parse_command_with_arg(RequestType::MAIL_FROM, trimmed_request, 2..trimmed_request.len() - 1);
         } else if raw_request.starts_with(RCPT_TO) {
-            request_res =  RequestType::parse_command_with_arg(RequestType::RCPT_TO, raw_request, RCPT_TO.len() + 3..raw_request.len() - 1);
+            let trimmed_request = &Self::remove_whitespace(&raw_request[RCPT_TO.len()..]);
+            request_res =  RequestType::parse_command_with_arg(RequestType::RCPT_TO, trimmed_request, 2..trimmed_request.len() - 1);
         } else if raw_request.starts_with(DATA) {
             request_res = Ok(RequestType::DATA);
         } else if raw_request.starts_with(QUIT) {
@@ -84,6 +86,10 @@ impl RequestType {
         } else {
             RequestType::argument_parsing_error(&cmd_type(String::new()).to_string())
         }
+    }
+
+    fn remove_whitespace(raw_request: &str) -> String {
+        raw_request.chars().filter(|c| !c.is_whitespace()).collect()
     }
 
     fn argument_parsing_error(command: &str) -> Result<RequestType, String> {
@@ -140,6 +146,10 @@ mod tests {
     fn test_parse_mail_from() {
         let request = RequestType::parse("MAIL FROM:<user@example.com>").unwrap();
         assert_eq!(request, RequestType::MAIL_FROM("user@example.com".to_string()));
+
+        // also tolerate whitespace
+        let request = RequestType::parse("MAIL FROM:  <user@example.com>").unwrap();
+        assert_eq!(request, RequestType::MAIL_FROM("user@example.com".to_string()));
     }
 
     #[test]
@@ -152,6 +162,10 @@ mod tests {
     fn test_parse_rcpt_to() {
         let request = RequestType::parse("RCPT TO:<user@example.com>").unwrap();
         assert_eq!(request, RequestType::RCPT_TO("user@example.com".to_string()));
+
+        // also tolerate whitespace
+        let request = RequestType::parse("RCPT TO:  <user@gmail.com>").unwrap();
+        assert_eq!(request, RequestType::RCPT_TO("user@gmail.com".to_string()));
     }
 
     #[test]
