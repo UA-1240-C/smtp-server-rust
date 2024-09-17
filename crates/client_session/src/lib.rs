@@ -28,15 +28,15 @@ pub struct SessionData {
     pub data: String,
 }
 
-pub struct ClientSession<'a> {
+pub struct ClientSession {
     current_state: ClientState,
     connection: Option<AsyncStream>,
     connection_data: SessionData,
     tls_acceptor: TlsAcceptor,
-    db_connection: PgMailDB<'a>,
+    db_connection: PgMailDB,
 }
 
-impl ClientSession<'_> {
+impl ClientSession {
     #[log(debug)]
     pub fn new(connection: AsyncStream, tls_acceptor: &TlsAcceptor, connection_string: &str)
     -> Result<Self, ClientSessionError> {
