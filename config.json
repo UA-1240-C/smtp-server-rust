@@ -14,4 +14,7 @@
     "thread-pool": {
         "pool-size": 1,
     },
+    "communication": {
+        "max-connection-timeout": 300
+    },
 }

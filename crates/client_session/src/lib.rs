@@ -55,7 +55,7 @@ impl ClientSession<'_> {
     #[log(trace)]
     async fn handle_new_request(&mut self) -> Result<(), ClientSessionError> {
         let connection = self.connection.as_mut().ok_or(ClientSessionError::ClosedConnection)?;
-        let raw_request = connection.read().await?;
+        let raw_request = connection.read_until("\r\n").await?;
         let request = RequestType::parse(&raw_request);
 
         match request {
@@ -286,21 +286,13 @@ impl ClientSession<'_> {
     #[log(debug)]
     async fn read_data_until_dot(stream: &mut AsyncStream) -> Result<String, String> {
         const MAX_SIZE: usize = 1024 * 1024 * 2;
-        let mut data = String::new();
-        loop {
-            let line = stream.read().await;
-            
-            if let Ok(line) = line {
-                if line.ends_with("\r\n.\r\n") {
-                    data.push_str(&line[..line.len() - 5]);
-                    break;
-                }
-                data.push_str(&line);
-            }
-            if data.len() > MAX_SIZE {
-                return Err("Data size is too big".into());
-            }
+        let data = stream.read_until("\r\n.\r\n").await
+            .map_err(|_| "Error on read")?;
+
+        if data.len() > MAX_SIZE {
+            return Err("Data size is too big".into());
         }
+        
         Ok(data)
     }
 }
