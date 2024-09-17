@@ -17,7 +17,7 @@ use std::env;
 
 fn main() {
     dotenv().ok();
-    logger::set_logger_level(logger::LogLevel::Trace);
+
     logger::set_logger_target(Box::new(logger::ConsoleLogTarget));
 
     let cfg = config::Config::default();
