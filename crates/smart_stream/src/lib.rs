@@ -39,7 +39,6 @@ where
         }
     }
 }
-
 impl<T> Write for StreamIo<T>
 where
     T: Read + Write + Unpin,
@@ -205,6 +204,11 @@ impl AsyncStream {
 
                 loop {
                     let n = timeout(std::time::Duration::from_secs(self.m_timeout), stream.read(&mut chunk)).await??;
+                    
+                    if n == 0 {
+                        Err(SmartStreamError::ClosedConnection(
+                            "Connection closed by peer".to_string()))?;
+                    }
 
                     response.extend_from_slice(&chunk[..n]);
 
