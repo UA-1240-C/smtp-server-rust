@@ -2,4 +2,4 @@ target/
 Cargo.lock
 server/certs/
 
-
+.env
