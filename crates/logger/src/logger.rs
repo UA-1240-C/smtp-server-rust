@@ -1,6 +1,10 @@
 #![allow(dead_code)]
 
-use std::{fs::File, path, sync::{atomic::{AtomicPtr, AtomicU32}, Arc, Mutex}};
+use std::{fs::File,
+          io::Write,
+          path,
+          sync::{atomic::{AtomicPtr, AtomicU32},
+                 Arc, Mutex}};
 use chrono::{DateTime, Local};
 
 pub struct LogMessage {
@@ -10,19 +14,46 @@ pub struct LogMessage {
     message: String,
 }
 
-impl std::fmt::Display for LogMessage {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let uncolored = format!("[{}] [{:?}] [{:5}] {}", self.timestamp.format("%Y-%m-%d %H:%M:%S.%f"), self.thread_id, format!("{:?}", self.level), self.message);
-        let colored = match self.level {
-            LogLevel::Info => format!("\x1b[32m{}\x1b[0m", uncolored),
-            LogLevel::Warn => format!("\x1b[33m{}\x1b[0m", uncolored),
-            LogLevel::Error => format!("\x1b[31m{}\x1b[0m", uncolored),
-            LogLevel::Debug => format!("\x1b[34m{}\x1b[0m", uncolored),
-            LogLevel::Trace => format!("\x1b[35m{}\x1b[0m", uncolored),
-        };
-        write!(f, "{}", colored)
+pub struct Colors {
+    info: String,
+    warn: String,
+    error: String,
+    debug: String,
+    trace: String
+}
+impl Colors {
+    fn new(message_fmt: String) -> Self {
+        Colors {
+            info: format!("\x1b[1;32m{}\x1b[0m", message_fmt), // green
+            warn: format!("\x1b[1;33m{}\x1b[0m", message_fmt), // yellow
+            error: format!("\x1b[1;31m{}\x1b[0m", message_fmt), // red
+            debug: format!("\x1b[1;34m{}\x1b[0m", message_fmt), // blue
+            trace: format!("\x1b[1;35m{}\x1b[0m", message_fmt) // magenta
+        }
     }
 }
+
+impl std::fmt::Display for LogMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let message_fmt = format!("[{}] {:?}] [{:5}] {}",
+                                  self.timestamp.format("%Y-%m-%d %H:%M:%S.%f"),
+                                  self.thread_id,
+                                  format!("{:?}", self.level),
+                                  self.message
+        );
+        let colors = Colors::new(message_fmt);
+        let colored_msg = match self.level {
+            LogLevel::Info => colors.info,
+            LogLevel::Warn => colors.warn,
+            LogLevel::Error => colors.error,
+            LogLevel::Debug => colors.debug,
+            LogLevel::Trace => colors.trace,
+        };
+
+        write!(f, "{}", colored_msg)
+    }
+}
+
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Clone, Copy)]
 pub enum LogLevel {
@@ -47,39 +78,40 @@ impl LogTarget for NoopLogTarget {
 
 pub struct ConsoleLogTarget;
 
-use std::io::Write;
-
 impl LogTarget for ConsoleLogTarget {
     fn log(&self, message: &str) {
         let result = write!(std::io::stdout(), "{}", message);
-        if result.is_err() {
-            eprintln!("Failed to write to stdout");
+        match result {
+            Ok(_) => {},
+            Err(_) => eprintln!("Failed to write to stdout"),
         }
     }
     fn flush(&mut self) {
         let result = std::io::stdout().flush();
-        if result.is_err() {
-            eprintln!("Failed to flush stdout");
+        match result {
+            Ok(_) => {},
+            Err(_) => eprintln!("Failed to flush stdout"),
         }
     }
 }
 
 pub struct FileLogTarget {
-    file: File,
+    file: File
 }
 
 impl LogTarget for FileLogTarget {
     fn log(&self, message: &str) {
-        use std::io::Write;
         let result = write!(&self.file, "{}", message);
-        if result.is_err() {
-            eprintln!("Failed to write to file");
+        match result {
+            Ok(_) => {},
+            Err(_) => eprintln!("Failed to write to log file"),
         }
     }
     fn flush(&mut self) {
         let result = self.file.flush();
-        if result.is_err() {
-            eprintln!("Failed to flush file");
+        match result {
+            Ok(_) => {},
+            Err(_) => eprintln!("Failed to flush log file"),
         }
 
     }
@@ -87,17 +119,24 @@ impl LogTarget for FileLogTarget {
 
 impl FileLogTarget {
     pub fn new(path: &path::Path) -> Self {
-        let file = File::create(path).unwrap();
-        FileLogTarget { file }
+        let file = File::create(path);
+        match file {
+            Ok(file) => FileLogTarget { file },
+            Err(err) => {
+                eprintln!("Failed to create file: {:?}", err);
+                FileLogTarget {
+                    // FIXME
+                    file: File::create("../serverlog.txt").unwrap_or_else(|_| File::create("").unwrap())
+                }
+            }
+        }
     }
 }
-
-
 
 pub enum LogCommand {
     Log(LogMessage),
     Flush,
-    Terminate,
+    Terminate
 }
 
 pub struct Logger {
@@ -105,7 +144,7 @@ pub struct Logger {
     logger_thread: Mutex<Option<std::thread::JoinHandle<()>>>,
     level: Arc<AtomicPtr<LogLevel>>,
     target: Arc<AtomicPtr<Box<dyn LogTarget + Send + Sync>>>,
-    cache_capacity: Arc<AtomicU32>,
+    cache_capacity: Arc<AtomicU32>
 }
 
 impl Logger {
@@ -124,7 +163,7 @@ impl Logger {
                 cache_capacity.clone()))),
             level: level_ptr.clone(),
             target: target_ptr.clone(),
-            cache_capacity: cache_capacity.clone(),
+            cache_capacity: cache_capacity.clone()
         };
 
         logger
@@ -135,19 +174,19 @@ impl Logger {
             level,
             thread_id: std::thread::current().id(),
             timestamp: chrono::Local::now(),
-            message,
+            message
         };
         match self.sender.send(LogCommand::Log(message)) {
             Ok(_) => {},
-            Err(_) => eprintln!("Failed to send log message to logger thread"),
+            Err(_) => eprintln!("Failed to send log message to logger thread")
         }
     }
 
     fn start_logger_thread(receiver: crossbeam::channel::Receiver<LogCommand>,
         target: Arc<AtomicPtr<Box<dyn LogTarget + Send + Sync>>>,
         level: Arc<AtomicPtr<LogLevel>>,
-        cache_capacity: Arc<AtomicU32>) -> std::thread::JoinHandle<()> {
-
+        cache_capacity: Arc<AtomicU32>
+    ) -> std::thread::JoinHandle<()> {
 
         std::thread::spawn(move || {
 
@@ -167,9 +206,7 @@ impl Logger {
 
                         let cache_capacity = cache_capacity.load(std::sync::atomic::Ordering::Acquire) as usize;
                         if cache.len() >= cache_capacity {
-                            if let Some(target) = unsafe { target.load(std::sync::atomic::Ordering::Acquire).as_mut() } {
-                                Self::flush(target, &mut cache);
-                            }
+                            Self::flush_cache(&mut cache, &target);
 
                             if cache.capacity() != cache_capacity {
                                 cache = Vec::with_capacity(cache_capacity);
@@ -177,15 +214,10 @@ impl Logger {
                         }
                     }
                     Ok(LogCommand::Flush) => {
-                        if let Some(target) = unsafe { target.load(std::sync::atomic::Ordering::Acquire).as_mut() } {
-                            Self::flush(target, &mut cache);
-                        }
+                        Self::flush_cache(&mut cache, &target);
                     }
                     Ok(LogCommand::Terminate) => {
-
-                        if let Some(target) = unsafe { target.load(std::sync::atomic::Ordering::Acquire).as_mut() } {
-                            Self::flush(target, &mut cache);
-                        }
+                        Self::flush_cache(&mut cache, &target);
 
                         while let Ok(LogCommand::Log(message)) = receiver.try_recv() {
                             let current_level = level.load(std::sync::atomic::Ordering::Acquire);
@@ -215,8 +247,17 @@ impl Logger {
         cache.clear();
     }
 
+    fn flush_cache(cache: &mut Vec<LogMessage>,
+                   target: &Arc<AtomicPtr<Box<dyn LogTarget + Send + Sync>>>) {
+        if let Some(target) = unsafe { target.load(std::sync::atomic::Ordering::Acquire).as_mut() } {
+            Self::flush(target, cache);
+        }
+    }
+
     fn concat_cache(cache: &Vec<LogMessage>) -> String {
-        cache.iter().map(|message| format!("{}\n", message.to_string())).collect()
+        cache.iter().map(|message| {
+            format!("{}\n", message)
+        }).collect()
     }
 
     pub fn update_level(&self, level: LogLevel) {
