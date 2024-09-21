@@ -3,3 +3,5 @@ Cargo.lock
 server/certs/
 
 .env
+
+logs
