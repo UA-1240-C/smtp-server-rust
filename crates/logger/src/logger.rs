@@ -128,3 +128,107 @@ impl FileLogTarget {
         }
     }
 }
+
+pub struct Logger {
+    mpmc_queue: Arc<ArrayQueue<LogMessage>>,
+    is_running: Arc<AtomicBool>,
+    severity_level: Arc<AtomicPtr<LogLevel>>,
+    targets: Vec<Box<dyn LogTarget + Send + Sync>>
+}
+
+impl Logger {
+    pub fn new(
+        severity_level: LogLevel,
+        filename: String
+    ) -> Self {
+        const QUEUE_CAPACITY: usize = 1024;
+        let mpmc_queue = Arc::new(ArrayQueue::new(QUEUE_CAPACITY));
+        let is_running = Arc::new(AtomicBool::new(true));
+        let severity_level_ptr = Arc::new(AtomicPtr::new(Box::into_raw(Box::new(severity_level))));
+        let filepath = Path::new(&filename);
+        let targets: Vec<Box<dyn LogTarget + Send + Sync>> = vec![
+            Box::new(ConsoleLogTarget),
+            Box::new(FileLogTarget::new(filepath)),
+            // Box::new(SyslogTarget)
+        ];
+
+        let logger = Logger {
+            mpmc_queue,
+            is_running,
+            severity_level: severity_level_ptr,
+            targets
+        };
+        logger
+    }
+
+    pub fn log(
+        &self,
+        log_level: LogLevel,
+        message: String
+    ) {
+        let log_message = LogMessage {
+            level: log_level,
+            thread_id: thread::current().id(),
+            timestamp: Local::now(),
+            message: message.to_string()
+        };
+        if self.mpmc_queue.is_full() {
+            eprintln!("Logger queue is full! BAD!");
+            return;
+        }
+        match self.mpmc_queue.push(log_message) {
+            Ok(_) => {}
+            Err(_) => eprintln!("Failed to push log to the queue! BAD!"),
+        };
+    }
+
+    pub fn log_write(
+        &self,
+        log_message: &LogMessage
+    ) -> ()  {
+        let task_severity_level = log_message.level;
+        let filter_severity_level = unsafe {
+            let sl = self.severity_level.load(std::sync::atomic::Ordering::Acquire);
+            *sl
+        };
+        if task_severity_level > filter_severity_level {
+            return;
+        }
+        for target in self.targets.iter() {
+            target.log(log_message.to_string());
+        }
+    }
+
+    pub fn update_severity_level(
+        &self,
+        level: LogLevel
+    ) -> () {
+        let new_level_ptr = Box::into_raw(Box::new(level));
+        self.severity_level.store(new_level_ptr, std::sync::atomic::Ordering::Release);
+    }
+
+    // TODO: implement this function properly: rn theres a conflict with
+    // static logger and mutability of targets
+    pub fn update_filename(
+        &mut self,
+        filename: String
+    ) -> () {
+        let filepath = Path::new(&filename);
+        let new_target = Box::new(FileLogTarget::new(filepath));
+        let new_target_ptr = Box::into_raw(new_target);
+        self.targets[1] = unsafe { Box::from_raw(new_target_ptr) };
+    }
+
+    pub fn shutdown(&self) -> () {
+        self.is_running.store(false, std::sync::atomic::Ordering::Release);
+        while let Some(msg) = self.mpmc_queue.pop() {
+            self.log_write(&msg);
+        }
+    }
+
+    pub fn get_log_level(&self) -> LogLevel {
+        let level_ptr = self.severity_level.load(std::sync::atomic::Ordering::Acquire);
+        let level = unsafe { &*level_ptr };
+        *level
+    }
+}
