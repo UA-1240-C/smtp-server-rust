@@ -22,6 +22,8 @@ fn main() {
 
     let cfg = config::Config::default();
 
+    logger::initialize_logger(cfg.log_level, "serverlog.txt".to_string());
+
     logger::set_logger_level(cfg.log_level);
     logger::set_logger_target(cfg.log_target);
     logger::set_logger_cache_capacity(cfg.capacity);
