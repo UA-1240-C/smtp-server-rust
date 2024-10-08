@@ -69,3 +69,31 @@ pub enum LogLevel {
     Debug,
     Trace,
 }
+
+pub trait LogTarget {
+    fn log(&self,
+           message: String
+    );
+}
+
+pub struct NoopLogTarget;
+
+impl LogTarget for NoopLogTarget {
+    fn log(&self,
+           _message: String
+    ) {}
+}
+
+pub struct ConsoleLogTarget;
+
+impl LogTarget for ConsoleLogTarget {
+    fn log(&self,
+           message: String
+    ) {
+        let result = write!(std::io::stdout(), "{}", message);
+        match result {
+            Ok(_) => {},
+            Err(_) => eprintln!("Failed to write to stdout! BAD!"),
+        }
+    }
+}
