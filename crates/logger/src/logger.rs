@@ -232,3 +232,26 @@ impl Logger {
         *level
     }
 }
+
+pub fn start_consumer_thread() {
+    let consumer_queue_ptr = LOGGER.mpmc_queue.clone();
+    let consumer_is_running_ptr = LOGGER.is_running.clone();
+    let consumer_severity_level_ptr = LOGGER.severity_level.clone();
+
+    thread::spawn(move || unsafe {
+        const BATCH_SIZE: usize = 32;
+        let severity_to_compare = consumer_severity_level_ptr.load(std::sync::atomic::Ordering::Acquire);
+        while consumer_is_running_ptr.load(std::sync::atomic::Ordering::Acquire)
+            || !consumer_queue_ptr.is_empty() {
+            while let Some(msg) = consumer_queue_ptr.pop() {
+                if msg.level < *severity_to_compare {
+                    continue;
+                }
+                Logger::log_write(&**LOGGER,
+                                  &msg
+                );
+            }
+        }
+    });
+
+}
