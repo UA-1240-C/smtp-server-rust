@@ -1,18 +1,18 @@
-#![allow(dead_code)]
-
 use chrono::{DateTime, Local};
-use crossbeam_queue::ArrayQueue;
 use std::{fs::File,
-          io::Write,
+          io::{Write, IsTerminal},
           sync::{atomic::{AtomicPtr, AtomicBool},
                  Arc
           },
           thread
 };
+use std::any::Any;
 use std::path::Path;
+use std::sync::atomic::AtomicU32;
 use std::thread::ThreadId;
-use crate::LOGGER;
+use crate::{LOGGER, LOGGING_QUEUE};
 
+#[derive(Clone)]
 pub struct LogMessage {
     level: LogLevel,
     thread_id: ThreadId,
@@ -41,23 +41,28 @@ impl Colors {
 }
 
 impl std::fmt::Display for LogMessage {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self,
+           f: &mut std::fmt::Formatter
+    ) -> std::fmt::Result {
         let message_fmt = format!("{:?} - {} [{:5}] - {}",
                                   self.thread_id,
                                   self.timestamp.format("%d/%m/%Y %H:%M:%S.%f"),
                                   format!("{:?}", self.level),
                                   self.message
         );
-        let colors = Colors::new(message_fmt);
-        let colored_msg = match self.level {
-            LogLevel::Info => colors.info,
-            LogLevel::Warn => colors.warn,
-            LogLevel::Error => colors.error,
-            LogLevel::Debug => colors.debug,
-            LogLevel::Trace => colors.trace,
-        };
-
-        write!(f, "{}", colored_msg)
+        if std::io::stdout().is_terminal() {
+            let colors = Colors::new(message_fmt);
+            let colored_msg = match self.level {
+                LogLevel::Info => colors.info,
+                LogLevel::Warn => colors.warn,
+                LogLevel::Error => colors.error,
+                LogLevel::Debug => colors.debug,
+                LogLevel::Trace => colors.trace,
+            };
+            write!(f, "{}", colored_msg)
+        } else {
+            write!(f, "{}", message_fmt)
+        }
     }
 }
 
@@ -74,6 +79,7 @@ pub trait LogTarget {
     fn log(&self,
            message: String
     );
+    fn as_any(&self) -> &dyn Any;
 }
 
 pub struct NoopLogTarget;
@@ -82,6 +88,10 @@ impl LogTarget for NoopLogTarget {
     fn log(&self,
            _message: String
     ) {}
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 pub struct ConsoleLogTarget;
@@ -90,11 +100,15 @@ impl LogTarget for ConsoleLogTarget {
     fn log(&self,
            message: String
     ) {
-        let result = write!(std::io::stdout(), "{}", message);
+        let result = writeln!(std::io::stdout(), "{}", message);
         match result {
             Ok(_) => {},
             Err(_) => eprintln!("Failed to write to stdout! BAD!"),
         }
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
@@ -111,6 +125,10 @@ impl LogTarget for FileLogTarget {
             Ok(_) => {},
             Err(_) => eprintln!("Failed to write to log file!"),
         }
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
@@ -130,33 +148,45 @@ impl FileLogTarget {
 }
 
 pub struct Logger {
-    mpmc_queue: Arc<ArrayQueue<LogMessage>>,
+    queue_capacity: Arc<AtomicU32>,
     is_running: Arc<AtomicBool>,
     severity_level: Arc<AtomicPtr<LogLevel>>,
-    targets: Vec<Box<dyn LogTarget + Send + Sync>>
+    targets: Arc<AtomicPtr<Vec<Box<dyn LogTarget + Send + Sync>>>>
 }
 
 impl Logger {
     pub fn new(
         severity_level: LogLevel,
-        filename: String
+        queue_capacity: usize,
+        target: Box<dyn LogTarget + Send + Sync>
     ) -> Self {
-        const QUEUE_CAPACITY: usize = 1024;
-        let mpmc_queue = Arc::new(ArrayQueue::new(QUEUE_CAPACITY));
         let is_running = Arc::new(AtomicBool::new(true));
         let severity_level_ptr = Arc::new(AtomicPtr::new(Box::into_raw(Box::new(severity_level))));
-        let filepath = Path::new(&filename);
-        let targets: Vec<Box<dyn LogTarget + Send + Sync>> = vec![
-            Box::new(ConsoleLogTarget),
-            Box::new(FileLogTarget::new(filepath)),
-            // Box::new(SyslogTarget)
-        ];
+
+        let mut targets: Vec<Box<dyn LogTarget + Send + Sync>> = vec![];
+        if target.as_any().downcast_ref::<ConsoleLogTarget>().is_some() {
+            const DEFAULT_LOG_FILENAME: &str = "serverlog.txt";
+            let default_log_filename = DEFAULT_LOG_FILENAME.to_string();
+            let filepath = Path::new(&default_log_filename);
+
+            targets = vec![
+                target,
+                Box::new(FileLogTarget::new(filepath))
+            ];
+        } else {
+            targets = vec![
+                Box::new(ConsoleLogTarget),
+                target
+            ];
+        }
+
+        let targets_ptr = Arc::new(AtomicPtr::new(Box::into_raw(Box::new(targets))));
 
         let logger = Logger {
-            mpmc_queue,
+            queue_capacity: Arc::new(AtomicU32::new(queue_capacity as u32)),
             is_running,
             severity_level: severity_level_ptr,
-            targets
+            targets: targets_ptr
         };
         logger
     }
@@ -172,14 +202,11 @@ impl Logger {
             timestamp: Local::now(),
             message: message.to_string()
         };
-        if self.mpmc_queue.is_full() {
-            eprintln!("Logger queue is full! BAD!");
-            return;
+
+        match LOGGING_QUEUE.push(log_message) {
+            Ok(_) => {},
+            Err(_) => eprintln!("Queue is full! Failed to push log to the queue!")
         }
-        match self.mpmc_queue.push(log_message) {
-            Ok(_) => {}
-            Err(_) => eprintln!("Failed to push log to the queue! BAD!"),
-        };
     }
 
     pub fn log_write(
@@ -194,8 +221,11 @@ impl Logger {
         if task_severity_level > filter_severity_level {
             return;
         }
-        for target in self.targets.iter() {
-            target.log(log_message.to_string());
+        unsafe {
+            let targets_ptr = self.targets.load(std::sync::atomic::Ordering::Acquire);
+            for target in (*targets_ptr).iter() {
+                target.log(log_message.to_string());
+            }
         }
     }
 
@@ -207,21 +237,28 @@ impl Logger {
         self.severity_level.store(new_level_ptr, std::sync::atomic::Ordering::Release);
     }
 
-    // TODO: implement this function properly: rn theres a conflict with
-    // static logger and mutability of targets
-    pub fn update_filename(
-        &mut self,
-        filename: String
+    pub fn add_target(
+        &self,
+        target: Box<dyn LogTarget + Send + Sync>
     ) -> () {
-        let filepath = Path::new(&filename);
-        let new_target = Box::new(FileLogTarget::new(filepath));
-        let new_target_ptr = Box::into_raw(new_target);
-        self.targets[1] = unsafe { Box::from_raw(new_target_ptr) };
+        if target.as_any().downcast_ref::<ConsoleLogTarget>().is_some() {
+            return;
+        } else {
+            let targets_vec = Box::into_raw(Box::new(vec![
+                Box::new(ConsoleLogTarget),
+                target
+            ]));
+            self.targets.store(targets_vec, std::sync::atomic::Ordering::Release);
+        }
+    }
+
+    pub fn update_queue_capacity(&self, capacity: usize) {
+        self.queue_capacity.store(capacity as u32, std::sync::atomic::Ordering::Release);
     }
 
     pub fn shutdown(&self) -> () {
         self.is_running.store(false, std::sync::atomic::Ordering::Release);
-        while let Some(msg) = self.mpmc_queue.pop() {
+        while let Some(msg) = LOGGING_QUEUE.pop() {
             self.log_write(&msg);
         }
     }
@@ -234,24 +271,18 @@ impl Logger {
 }
 
 pub fn start_consumer_thread() {
-    let consumer_queue_ptr = LOGGER.mpmc_queue.clone();
-    let consumer_is_running_ptr = LOGGER.is_running.clone();
-    let consumer_severity_level_ptr = LOGGER.severity_level.clone();
-
-    thread::spawn(move || unsafe {
-        const BATCH_SIZE: usize = 32;
-        let severity_to_compare = consumer_severity_level_ptr.load(std::sync::atomic::Ordering::Acquire);
-        while consumer_is_running_ptr.load(std::sync::atomic::Ordering::Acquire)
-            || !consumer_queue_ptr.is_empty() {
-            while let Some(msg) = consumer_queue_ptr.pop() {
-                if msg.level < *severity_to_compare {
-                    continue;
+    let consumer_queue_ptr = LOGGING_QUEUE.clone();
+    unsafe {
+        thread::spawn(move || unsafe {
+            while LOGGER.is_running.load(std::sync::atomic::Ordering::Acquire)
+                || !consumer_queue_ptr.is_empty() {
+                while let Some(msg) = consumer_queue_ptr.pop() {
+                    if msg.level < *LOGGER.severity_level.load(std::sync::atomic::Ordering::Acquire) {
+                        continue;
+                    }
+                    LOGGER.log_write(&msg);
                 }
-                Logger::log_write(&**LOGGER,
-                                  &msg
-                );
             }
-        }
-    });
-
+        });
+    }
 }
