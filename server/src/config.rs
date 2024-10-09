@@ -5,13 +5,13 @@ use std::{
     path::Path,
 };
 
-use logger::{info, warn, ConsoleLogTarget, FileLogTarget, LogLevel, LogTarget};
+use logger::{info, warn, targets::ConsoleLogTarget, targets::FileLogTarget, LogLevel, targets::LogTarget};
 
 pub struct Config {
     pub ip: String,
     pub port: u16,
     pub log_level: LogLevel,
-    pub log_target: Box<dyn logger::LogTarget + Send + Sync + 'static>,
+    pub log_target: Box<dyn LogTarget + Send + Sync + 'static>,
     pub capacity: usize,
     pub pool_size: usize,
     pub timeout: u64,
