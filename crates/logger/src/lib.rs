@@ -53,7 +53,7 @@ pub fn log_prod(message: String) {
     unsafe { LOGGER.log(LogLevel::Info, message); }
 }
 
-pub fn log_prod_error(message: String) {
+pub fn log_error(message: String) {
     unsafe { LOGGER.log(LogLevel::Error, message); }
 }
 
