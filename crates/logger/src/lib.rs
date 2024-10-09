@@ -8,10 +8,16 @@ use std::{
 };
 use std::ops::Deref;
 use std::sync::LazyLock;
+
 pub use logger::*;
+use crate::msg_fmt::*;
+use crate::targets::*;
+use crate::writer::*;
+
 mod logger_macro;
 mod writer;
-mod queue;
+pub mod targets;
+mod msg_fmt;
 
 const DEFAULT_LOG_CAPACITY: usize = 1000;
 
