@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::fs::File;
 use std::path::Path;
 use std::io::Write;
@@ -6,6 +7,7 @@ pub trait LogTarget {
     fn log(&self,
            message: String
     );
+    fn as_any(&self) -> &dyn Any;
 }
 
 pub struct NoopLogTarget;
@@ -14,6 +16,10 @@ impl LogTarget for NoopLogTarget {
     fn log(&self,
            _message: String
     ) {}
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 pub struct ConsoleLogTarget;
@@ -27,6 +33,10 @@ impl LogTarget for ConsoleLogTarget {
             Ok(_) => {},
             Err(_) => eprintln!("Failed to write to stdout! BAD!"),
         }
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
@@ -43,6 +53,10 @@ impl LogTarget for FileLogTarget {
             Ok(_) => {},
             Err(_) => eprintln!("Failed to write to log file!"),
         }
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
