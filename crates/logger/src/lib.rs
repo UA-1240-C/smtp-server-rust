@@ -1,12 +1,7 @@
 mod logger;
 
 use crossbeam_queue::ArrayQueue;
-use std::any::Any;
-use std::{
-    io::{IsTerminal, Write},
-    sync::Arc
-};
-use std::ops::Deref;
+use std::{sync::Arc};
 use std::sync::LazyLock;
 
 pub use logger::*;
