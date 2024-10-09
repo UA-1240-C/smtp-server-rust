@@ -20,7 +20,7 @@ static LOGGING_QUEUE: LazyLock<Arc<ArrayQueue<LogMessage>>> = LazyLock::new(||{
     Arc::new(ArrayQueue::new(DEFAULT_LOG_CAPACITY)
     )});
 
-static mut LOGGER : LazyLock<Arc<Logger>> = LazyLock::new(||{Arc::new(Logger::new(LogLevel::Info,
+static mut LOGGER : LazyLock<Arc<Logger>> = LazyLock::new(||{Arc::new(Logger::new(LogLevel::Trace,
                                                                               DEFAULT_LOG_CAPACITY,
                                                                               Box::new(ConsoleLogTarget)))});
 pub fn initialize_logger(
