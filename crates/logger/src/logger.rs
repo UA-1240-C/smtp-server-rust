@@ -100,6 +100,7 @@ impl Logger {
             for target in (*targets_ptr).iter() {
                 target.log(log_message.to_string());
             }
+            syslog_message(log_message.clone());
         }
     }
 
