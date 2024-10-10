@@ -22,10 +22,10 @@ pub enum LogLevel {
 }
 
 pub struct Logger {
-    queue_capacity: Arc<AtomicU32>,
-    pub(crate) is_running: Arc<AtomicBool>,
+    pub queue_capacity: Arc<AtomicU32>,
+    pub is_running: Arc<AtomicBool>,
     pub(crate) severity_level: Arc<AtomicPtr<LogLevel>>,
-    targets: Arc<AtomicPtr<Vec<Box<dyn LogTarget + Send + Sync>>>>
+    pub targets: Arc<AtomicPtr<Vec<Box<dyn LogTarget + Send + Sync>>>>
 }
 
 impl Logger {
@@ -142,5 +142,9 @@ impl Logger {
         let level_ptr = self.severity_level.load(std::sync::atomic::Ordering::Acquire);
         let level = unsafe { &*level_ptr };
         *level
+    }
+
+    pub fn get_is_running(&self) -> bool {
+        self.is_running.load(std::sync::atomic::Ordering::Acquire)
     }
 }

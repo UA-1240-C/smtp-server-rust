@@ -71,6 +71,19 @@ pub fn initialize_logger(
     start_consumer_thread();
 }
 
+/// Updates the severity level of the logger, changing the minimum level of severity
+/// that will be logged.
+/// This function allows for dynamic control over the logging behavior at runtime.
+///
+/// # Arguments:
+/// * `new_level`: The new severity level to be set (e.g., Trace, Debug, Error).
+///
+/// # Safety:
+/// Directly accesses the global `LOGGER` instance using `unsafe`.
+pub fn update_severity_level(new_level: LogLevel) {
+    unsafe { LOGGER.update_severity_level(new_level); }
+}
+
 /// Logs a message with the specified severity level.
 /// The log message is enqueued and will be processed by the consumer thread.
 ///
@@ -162,4 +175,17 @@ pub fn set_logger_target(target: Box<dyn LogTarget + Send + Sync>) {
 /// Directly accesses the global `LOGGER` instance using `unsafe`.
 pub fn get_logger_level() -> LogLevel {
     unsafe { LOGGER.get_log_level() }
+}
+
+/// Checks if the logger is currently running.
+/// This function can be used to determine if the logger is active and processing log messages.
+/// If the logger is not running, it may indicate an issue with the logging system.
+///
+/// # Returns:
+/// A boolean value indicating whether the logger is running (`true`) or not (`false`).
+///
+/// # Safety:
+/// Directly accesses the global `LOGGER` instance using `unsafe`.
+pub fn is_logger_running() -> bool {
+    unsafe { LOGGER.get_is_running() }
 }
