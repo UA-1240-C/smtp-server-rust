@@ -8,34 +8,34 @@ macro_rules! log {
 #[macro_export]
 macro_rules! info {
     ($($arg:tt)*) => {
-        $crate::log($crate::LogLevel::Info, format!($($arg)*));
+        $crate::log_prod(format!($($arg)*));
     }
 }
 
 #[macro_export]
 macro_rules! warn {
     ($($arg:tt)*) => {
-        $crate::log($crate::LogLevel::Warn, format!($($arg)*));
+        $crate::log_warn(format!($($arg)*));
     }
 }
 
 #[macro_export]
 macro_rules! error {
     ($($arg:tt)*) => {
-        $crate::log($crate::LogLevel::Error, format!($($arg)*));
+        $crate::log_error(format!($($arg)*));
     }
 }
 
 #[macro_export]
 macro_rules! debug {
     ($($arg:tt)*) => {
-        $crate::log($crate::LogLevel::Debug, format!($($arg)*));
+        $crate::log_debug(format!($($arg)*));
     }
 }
 
 #[macro_export]
 macro_rules! trace {
     ($($arg:tt)*) => {
-        $crate::log($crate::LogLevel::Trace, format!($($arg)*));
+        $crate::log_trace(format!($($arg)*));
     }
 }

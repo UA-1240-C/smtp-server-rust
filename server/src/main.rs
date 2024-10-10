@@ -18,13 +18,13 @@ use std::env;
 fn main() {
     dotenv().ok();
 
-    logger::set_logger_target(Box::new(logger::ConsoleLogTarget));
-
     let cfg = config::Config::default();
 
-    logger::set_logger_level(cfg.log_level);
-    logger::set_logger_target(cfg.log_target);
-    logger::set_logger_cache_capacity(cfg.capacity);
+    logger::initialize_logger(
+        cfg.log_level,
+        cfg.capacity,
+        cfg.log_target,
+        );
 
     let mut runtime = ConcurrentRuntime::new(cfg.pool_size);
     runtime.start();
