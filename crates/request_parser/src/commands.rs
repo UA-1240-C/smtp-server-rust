@@ -1,0 +1,12 @@
+pub const EHLO: &str = "EHLO";
+pub const HELO: &str = "HELO";
+pub const STARTTLS: &str = "STARTTLS";
+pub const AUTH_PLAIN: &str = "AUTH PLAIN";
+pub const REGISTER: &str = "REGISTER";
+pub const MAIL_FROM: &str = "MAIL FROM";
+pub const RCPT_TO: &str = "RCPT TO";
+pub const DATA: &str = "DATA";
+pub const QUIT: &str = "QUIT";
+pub const HELP: &str = "HELP";
+pub const NOOP: &str = "NOOP";
+pub const RSET: &str = "RSET";

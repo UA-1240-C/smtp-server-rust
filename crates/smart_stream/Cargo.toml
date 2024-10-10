@@ -1,0 +1,12 @@
+[package]
+name = "smart_stream"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+futures = "0.3.18"
+async-native-tls = "0.3.0"
+native-tls = "0.2.7"
+async-std = "1.10.0"
+logger = { path = "../logger" }
+logger_proc_macro = { path = "../logger_proc_macro" }

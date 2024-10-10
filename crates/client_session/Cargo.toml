@@ -1,0 +1,14 @@
+[package]
+name = "client_session"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+smart_stream = { path = "../smart_stream" }
+request_parser = { path = "../request_parser" }
+native-tls = "0.2.7"
+async-native-tls = "0.3.0"
+logger = { path = "../logger" }
+logger_proc_macro = { path = "../logger_proc_macro" }
+mail_database = { path = "../mail_database" }
+base64= { path = "../base64" }

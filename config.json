@@ -1,0 +1,20 @@
+{
+    "server": {
+        "server-name": "SMTP34",
+        "server-display-name": "SMTP-34-SERVER",
+        "ip-address": "10.5.0.2",
+        "port": 2525
+    },
+    "logging": {
+        "log-target": "file",
+        "file-path": "/var/log/smtp-server/smtp34.log",
+        "log-level": "debug",
+        "cache-capacity": 1
+    },
+    "thread-pool": {
+        "pool-size": 1
+    },
+    "communication": {
+        "max-connection-timeout": 300
+    },
+}

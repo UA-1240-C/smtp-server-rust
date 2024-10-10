@@ -1,0 +1,8 @@
+[package]
+name = "request_parser"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+logger = { path = "../logger" }
+logger_proc_macro = { path = "../logger_proc_macro" }
