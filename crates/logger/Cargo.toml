@@ -9,7 +9,7 @@ crossbeam = "0.8.4"
 crossbeam-queue = "0.3.11"
 
 #[cfg(target_os = "linux")]
-#syslog = "7.0.0"
+syslog = "7.0.0"
 
 #[cfg(target_os = "windows")]
 windows-sys = { version = "0.52.0", features = ["Win32_System_EventLog", "Win32_Foundation"] }
